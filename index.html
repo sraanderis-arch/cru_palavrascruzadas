@@ -1,0 +1,3145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Palavras Cruzadas — Edição Game & Relatório PDF</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@600;700;800&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      font-family: 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .font-game {
+      font-family: 'Fredoka', 'Rubik', sans-serif;
+    }
+
+    .font-mono-game {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      background: radial-gradient(circle at top center, #1e1b4b 0%, #0f172a 48%, #090d16 100%);
+      color: #f8fafc;
+      -webkit-tap-highlight-color: transparent;
+      min-height: 100vh;
+    }
+
+    /* Cards estilo painel de jogo 3D / tátil */
+    .game-panel {
+      background: linear-gradient(180deg, rgba(30, 41, 59, 0.92) 0%, rgba(15, 23, 42, 0.96) 100%);
+      border: 2px solid rgba(99, 102, 241, 0.28);
+      box-shadow: 0 10px 0 rgba(7, 11, 20, 0.65), 0 18px 32px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(10px);
+    }
+
+    .game-btn-3d {
+      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.15s ease;
+      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    .game-btn-3d:hover {
+      filter: brightness(1.07);
+    }
+
+    .game-btn-3d:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+    }
+
+    /* Tabuleiro de Palavras Cruzadas Arcade */
+    .crossword-grid {
+      display: grid;
+      gap: 4px;
+      background: linear-gradient(145deg, #0b1120 0%, #172038 100%);
+      padding: 10px;
+      border-radius: 18px;
+      border: 3px solid #312e81;
+      box-shadow:
+        inset 0 2px 10px rgba(0, 0, 0, 0.7),
+        0 12px 0 #090d16,
+        0 20px 35px rgba(0, 0, 0, 0.65);
+      user-select: none;
+    }
+
+    .cell-void {
+      background-color: rgba(15, 23, 42, 0.55);
+      border-radius: 8px;
+      border: 1px solid rgba(51, 65, 85, 0.25);
+    }
+
+    .cell-active {
+      position: relative;
+      background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%);
+      color: #0f172a;
+      border-radius: 9px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #94a3b8;
+      transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .cell-active:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+    }
+
+    .cell-highlighted {
+      background: linear-gradient(180deg, #e0e7ff 0%, #c7d2fe 100%) !important;
+      box-shadow: 0 4px 0 #818cf8 !important;
+    }
+
+    .cell-selected {
+      background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 0 #312e81, 0 0 16px rgba(99, 102, 241, 0.75) !important;
+      transform: translateY(-2px) scale(1.03);
+      z-index: 2;
+    }
+
+    /* Palavra 100% correta e travada */
+    .cell-locked-correct {
+      background: linear-gradient(180deg, #34d399 0%, #059669 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 0 #065f46, 0 0 14px rgba(16, 185, 129, 0.45) !important;
+      cursor: default;
+    }
+
+    .cell-locked-correct.cell-selected {
+      background: linear-gradient(180deg, #10b981 0%, #047857 100%) !important;
+      box-shadow: 0 4px 0 #064e3b, 0 0 18px rgba(52, 211, 153, 0.85) !important;
+    }
+
+    /* Erro imediato ao completar palavra incorreta */
+    .cell-wrong {
+      background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 0 #881337, 0 0 14px rgba(244, 63, 94, 0.5) !important;
+    }
+
+    .cell-wrong.cell-selected {
+      background: linear-gradient(180deg, #f43f5e 0%, #be123c 100%) !important;
+      box-shadow: 0 4px 0 #4c0519, 0 0 18px rgba(251, 113, 133, 0.85) !important;
+    }
+
+    /* Célula revelada por dica */
+    .cell-revealed {
+      background: linear-gradient(180deg, #fcd34d 0%, #d97706 100%) !important;
+      color: #1e1b4b !important;
+      box-shadow: 0 4px 0 #92400e !important;
+    }
+
+    .cell-preview {
+      background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 100%);
+      color: #0f172a;
+      border-radius: 6px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      box-shadow: 0 2px 0 #64748b;
+      font-size: clamp(0.65rem, 1.5vw, 0.9rem);
+    }
+
+    .cell-number {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      font-size: clamp(0.55rem, 1.35vw, 0.7rem);
+      font-weight: 800;
+      line-height: 1;
+      color: #475569;
+      pointer-events: none;
+    }
+
+    .cell-selected .cell-number,
+    .cell-locked-correct .cell-number,
+    .cell-wrong .cell-number {
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .cell-letter {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fredoka', 'Rubik', sans-serif;
+      font-size: clamp(0.95rem, 2.5vw, 1.4rem);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    /* Animações de feedback de jogo */
+    @keyframes popLetter {
+      0% { transform: scale(0.75); }
+      60% { transform: scale(1.18); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes celebrateCell {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.18) rotate(-3deg); filter: brightness(1.25); }
+      75% { transform: scale(0.96) rotate(2deg); }
+      100% { transform: scale(1) rotate(0deg); }
+    }
+
+    @keyframes shakeError {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+
+    .anim-pop {
+      animation: popLetter 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .anim-celebrate {
+      animation: celebrateCell 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .anim-shake {
+      animation: shakeError 0.42s ease-in-out;
+    }
+
+    /* Canvas de Confetes */
+    #confetti-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 60;
+    }
+
+    /* Impressão limpa de fallback */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-only-report {
+        display: block !important;
+      }
+    }
+
+    .print-only-report {
+      display: none;
+    }
+  </style>
+</head>
+<body class="flex flex-col selection:bg-indigo-500 selection:text-white">
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- Cabeçalho Arcade Superior -->
+  <header class="no-print bg-slate-950/85 border-b border-indigo-500/30 sticky top-0 z-30 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 text-white flex items-center justify-center font-game font-bold text-xl shadow-lg shadow-indigo-600/30 border border-white/20 shrink-0">
+          PZ
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h1 id="header-game-title" class="font-game text-lg sm:text-xl font-bold text-white tracking-wide leading-tight truncate">
+              Palavras Cruzadas
+            </h1>
+            <span class="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+              Arcade Edition
+            </span>
+          </div>
+          <p id="header-subtitle" class="text-xs text-slate-400 truncate">
+            Painel do Administrador &amp; Arena do Jogador
+          </p>
+        </div>
+      </div>
+
+      <!-- Alternância de Perfis + Som + Impressão -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button
+          id="sound-toggle-btn"
+          type="button"
+          onclick="toggleSound()"
+          class="px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center gap-1.5"
+          title="Ativar ou silenciar efeitos sonoros"
+        >
+          <span id="sound-icon">🔊</span>
+          <span id="sound-label" class="hidden md:inline">Som Ligado</span>
+        </button>
+
+        <div class="inline-flex rounded-2xl bg-slate-900 p-1 border border-slate-700/90 shadow-inner" role="tablist" aria-label="Alternar Perfil">
+          <button
+            id="tab-admin"
+            type="button"
+            onclick="requestSwitchToAdmin()"
+            class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md"
+          >
+            <span>🛠️</span>
+            <span>Administrador</span>
+          </button>
+          <button
+            id="tab-player"
+            type="button"
+            onclick="switchToPlayerMode()"
+            class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white"
+          >
+            <span>🎮</span>
+            <span>Jogar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container exclusivo para fallback de impressão -->
+  <div id="print-report-container" class="print-only-report p-6 text-slate-900 bg-white"></div>
+
+  <!-- Banner de Notificações / Avisos -->
+  <div id="toast-container" class="no-print max-w-7xl w-full mx-auto px-4 sm:px-6 pt-3 empty:pt-0"></div>
+
+  <!-- ======================================================================= -->
+  <!-- VIEW 1: PAINEL DO ADMINISTRADOR                                         -->
+  <!-- ======================================================================= -->
+  <main id="view-admin" class="no-print flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- COLUNA ESQUERDA (ADMIN): Configurações Gerais + Cronômetro + Segurança -->
+    <section class="lg:col-span-5 flex flex-col gap-6">
+      <div class="game-panel rounded-3xl p-5 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
+          <div>
+            <h2 class="font-game text-lg font-bold text-white flex items-center gap-2">
+              <span>⚙️</span>
+              <span>Configurações da Partida</span>
+            </h2>
+            <p class="text-xs text-slate-400">Personalize regras, cronômetro e segurança.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+            Salvo auto
+          </span>
+        </div>
+
+        <!-- Título Personalizado -->
+        <div>
+          <label for="admin-game-title" class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+            Título do Desafio
+          </label>
+          <input
+            id="admin-game-title"
+            type="text"
+            oninput="handleConfigChange()"
+            placeholder="Ex.: Desafio de Conhecimentos Gerais"
+            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-700 bg-slate-900/90 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <!-- Configuração de Cronômetro -->
+        <div class="p-4 rounded-2xl bg-slate-900/75 border border-slate-700/80 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="block text-sm font-bold text-white">⏱️ Ativar Cronômetro</span>
+              <span class="text-xs text-slate-400">Exibe relógio no HUD do Jogador</span>
+            </div>
+            <label class="inline-flex items-center cursor-pointer">
+              <input
+                id="admin-timer-enabled"
+                type="checkbox"
+                onchange="handleConfigChange()"
+                class="sr-only peer"
+              />
+              <div class="relative w-12 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+            </label>
+          </div>
+
+          <div id="admin-timer-options" class="hidden pt-3 border-t border-slate-800 space-y-3">
+            <div>
+              <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1.5">Modo do Cronômetro</label>
+              <div class="grid grid-cols-2 gap-2.5">
+                <label class="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="timer-mode"
+                    value="progressive"
+                    onchange="handleConfigChange()"
+                    class="sr-only peer"
+                    checked
+                  />
+                  <div class="p-2.5 rounded-xl border border-slate-700 bg-slate-800/80 peer-checked:border-indigo-400 peer-checked:bg-indigo-950/80 transition text-center">
+                    <div class="text-xs font-bold text-white">📈 Crescente</div>
+                    <div class="text-[11px] text-slate-400">Mede tempo gasto</div>
+                  </div>
+                </label>
+                <label class="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="timer-mode"
+                    value="countdown"
+                    onchange="handleConfigChange()"
+                    class="sr-only peer"
+                  />
+                  <div class="p-2.5 rounded-xl border border-slate-700 bg-slate-800/80 peer-checked:border-indigo-400 peer-checked:bg-indigo-950/80 transition text-center">
+                    <div class="text-xs font-bold text-white">⏳ Regressivo</div>
+                    <div class="text-[11px] text-slate-400">Limite de tempo</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div id="admin-countdown-inputs" class="hidden grid grid-cols-2 gap-3 bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+              <div>
+                <label for="admin-timer-minutes" class="block text-[11px] font-bold text-slate-400 mb-1">
+                  Minutos
+                </label>
+                <input
+                  id="admin-timer-minutes"
+                  type="number"
+                  min="0"
+                  max="180"
+                  value="5"
+                  oninput="handleConfigChange()"
+                  class="w-full px-3 py-1.5 text-sm font-mono-game font-bold rounded-lg border border-slate-700 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label for="admin-timer-seconds" class="block text-[11px] font-bold text-slate-400 mb-1">
+                  Segundos
+                </label>
+                <input
+                  id="admin-timer-seconds"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value="0"
+                  oninput="handleConfigChange()"
+                  class="w-full px-3 py-1.5 text-sm font-mono-game font-bold rounded-lg border border-slate-700 bg-slate-900 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Permissão de Dicas -->
+        <div class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/75 border border-slate-700/80">
+          <div>
+            <span class="block text-sm font-bold text-white">💡 Poderes de Dica</span>
+            <span class="text-xs text-slate-400">Permite revelar letra ou palavra no jogo</span>
+          </div>
+          <label class="inline-flex items-center cursor-pointer">
+            <input
+              id="admin-allow-hints"
+              type="checkbox"
+              checked
+              onchange="handleConfigChange()"
+              class="sr-only peer"
+            />
+            <div class="relative w-12 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-400 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+          </label>
+        </div>
+
+        <!-- PIN Opcional -->
+        <div class="p-3.5 rounded-2xl bg-slate-900/75 border border-slate-700/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="admin-pin-input" class="text-sm font-bold text-white flex items-center gap-1.5">
+              <span>🔒</span>
+              <span>PIN do Administrador</span>
+            </label>
+            <span id="admin-pin-status" class="text-[11px] font-semibold text-slate-400">Sem bloqueio</span>
+          </div>
+          <input
+            id="admin-pin-input"
+            type="password"
+            inputmode="numeric"
+            maxlength="8"
+            oninput="handleConfigChange()"
+            placeholder="Opcional (ex.: 1234)"
+            class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-700 bg-slate-950/90 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+
+        <!-- Exportar / Importar JSON -->
+        <div class="pt-2 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+          <button
+            type="button"
+            onclick="exportConfigJson()"
+            class="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1.5"
+          >
+            <span>📤</span>
+            <span>Exportar JSON</span>
+          </button>
+          <label class="flex-1 py-2.5 px-3 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center justify-center gap-1.5 cursor-pointer">
+            <span>📥</span>
+            <span>Importar JSON</span>
+            <input type="file" accept=".json,application/json" onchange="importConfigJson(event)" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Pré-visualização Rápida do Gabarito (Somente Admin) -->
+      <div class="game-panel rounded-3xl p-5 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="font-game text-base font-bold text-white">👁️ Gabarito da Fase</h3>
+            <p class="text-xs text-slate-400">Visível somente para o Administrador</p>
+          </div>
+          <button
+            type="button"
+            onclick="generateCrossword(true)"
+            class="px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-400/30 text-xs font-bold transition"
+          >
+            🔄 Embaralhar Grade
+          </button>
+        </div>
+
+        <div id="admin-unplaced-warning" class="hidden p-3 rounded-xl bg-amber-500/15 border border-amber-400/30 text-amber-200 text-xs font-medium"></div>
+
+        <div id="admin-preview-wrapper" class="w-full flex items-center justify-center overflow-x-auto py-3 bg-slate-950/70 rounded-2xl border border-slate-800 min-h-[180px]"></div>
+
+        <button
+          type="button"
+          onclick="saveAndGoToPlayer()"
+          class="game-btn-3d w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-game font-bold text-base tracking-wide flex items-center justify-center gap-2"
+        >
+          <span>🚀</span>
+          <span>INICIAR PARTIDA NO PAINEL DO JOGADOR</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- COLUNA DIREITA (ADMIN): Editor de Perguntas e Respostas -->
+    <section class="lg:col-span-7 game-panel rounded-3xl p-5 flex flex-col gap-4">
+      <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="font-game text-lg font-bold text-white">📝 Banco de Perguntas &amp; Respostas</h2>
+          <p class="text-xs text-slate-400">
+            Acentos são normalizados automaticamente na grade (ex.: <span class="text-indigo-300 font-semibold">CORAÇÃO</span> → <span class="font-mono-game text-emerald-300">CORACAO</span>).
+          </p>
+        </div>
+        <span id="word-count-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 shrink-0">
+          0 palavras
+        </span>
+      </div>
+
+      <!-- Barra de Exemplos e Limpeza -->
+      <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/75 p-3 rounded-2xl border border-slate-800">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-semibold text-slate-400 mr-1">Fases prontas:</span>
+          <button
+            type="button"
+            onclick="loadSampleSet('brasil')"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:border-indigo-400 hover:text-indigo-300 transition"
+          >
+            🇧🇷 Brasil &amp; Cultura
+          </button>
+          <button
+            type="button"
+            onclick="loadSampleSet('ciencia')"
+            class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-200 border border-slate-700 hover:border-indigo-400 hover:text-indigo-300 transition"
+          >
+            🔬 Ciência &amp; Espaço
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onclick="requestClearAllPairs()"
+          class="px-2.5 py-1 rounded-lg text-xs font-bold text-rose-400 hover:bg-rose-500/15 transition"
+        >
+          🗑️ Limpar tudo
+        </button>
+      </div>
+
+      <!-- Formulário para Adicionar / Editar Par -->
+      <form id="pair-form" onsubmit="handlePairSubmit(event)" class="space-y-3 bg-indigo-950/35 p-4 rounded-2xl border border-indigo-500/30">
+        <div class="flex items-center justify-between">
+          <span id="form-mode-label" class="text-xs font-bold uppercase tracking-wider text-indigo-300">
+            Adicionar nova palavra
+          </span>
+          <button
+            id="cancel-edit-btn"
+            type="button"
+            onclick="cancelEditPair()"
+            class="hidden text-xs font-semibold text-slate-400 hover:text-white underline"
+          >
+            Cancelar edição
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+          <div class="sm:col-span-7">
+            <label for="input-clue" class="block text-xs font-bold text-slate-300 mb-1">
+              Pergunta ou Dica
+            </label>
+            <input
+              id="input-clue"
+              type="text"
+              required
+              placeholder="Ex.: Capital do Brasil inaugurada em 1960"
+              class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-700 bg-slate-900 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div class="sm:col-span-5">
+            <div class="flex items-center justify-between mb-1">
+              <label for="input-answer" class="block text-xs font-bold text-slate-300">
+                Resposta
+              </label>
+              <span id="live-answer-preview" class="text-[11px] font-mono-game text-slate-400">
+                0 letras
+              </span>
+            </div>
+            <input
+              id="input-answer"
+              type="text"
+              required
+              oninput="updateLiveAnswerPreview()"
+              placeholder="Ex.: BRASÍLIA"
+              class="w-full px-3.5 py-2 text-sm font-bold uppercase rounded-xl border border-slate-700 bg-slate-900 text-emerald-300 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        <button
+          id="submit-pair-btn"
+          type="submit"
+          class="game-btn-3d w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold flex items-center justify-center gap-2"
+        >
+          <span>➕</span>
+          <span id="submit-pair-text">Adicionar à Fase</span>
+        </button>
+      </form>
+
+      <!-- Lista de Pares Cadastrados -->
+      <div class="space-y-2 max-h-[520px] overflow-y-auto pr-1" id="pairs-list"></div>
+    </section>
+  </main>
+
+  <!-- ======================================================================= -->
+  <!-- VIEW 2: ARENA DO JOGADOR (DESIGN ARCADE + CORREÇÃO INSTANTÂNEA + PDF)   -->
+  <!-- ======================================================================= -->
+  <main id="view-player" class="no-print hidden flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 flex-col gap-5">
+
+    <!-- HUD SUPERIOR DO JOGO -->
+    <div class="game-panel rounded-3xl p-4 flex flex-col gap-3.5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <!-- Identificação do Jogador + Pontos + Combo + Cronômetro -->
+        <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <!-- Nome do Jogador (usado no relatório PDF) -->
+          <div class="flex items-center gap-2 bg-slate-900/90 border border-slate-700 rounded-2xl px-3 py-1.5">
+            <span class="text-sm">🧑‍🚀</span>
+            <input
+              id="player-name-input"
+              type="text"
+              oninput="handlePlayerNameChange()"
+              placeholder="Seu nome (para o PDF)"
+              class="bg-transparent text-xs sm:text-sm font-semibold text-white placeholder-slate-500 focus:outline-none w-36 sm:w-44"
+            />
+          </div>
+
+          <!-- Placar de Pontos (XP) -->
+          <div class="flex items-center gap-2 bg-amber-500/15 border border-amber-400/35 rounded-2xl px-3.5 py-1.5">
+            <span class="text-base">⭐</span>
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-amber-300/80 leading-none">Pontos</div>
+              <div id="hud-score" class="font-mono-game text-base sm:text-lg font-extrabold text-amber-300 leading-tight">
+                0
+              </div>
+            </div>
+          </div>
+
+          <!-- Sequência / Combo -->
+          <div class="flex items-center gap-2 bg-purple-500/15 border border-purple-400/35 rounded-2xl px-3.5 py-1.5">
+            <span class="text-base">🔥</span>
+            <div>
+              <div class="text-[10px] font-bold uppercase tracking-wider text-purple-300/80 leading-none">Combo</div>
+              <div id="hud-combo" class="font-mono-game text-base sm:text-lg font-extrabold text-purple-300 leading-tight">
+                0x
+              </div>
+            </div>
+          </div>
+
+          <!-- Cronômetro (se ativado pelo Admin) -->
+          <div id="player-timer-box" class="hidden items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-slate-950 border border-cyan-500/40 shadow-inner">
+            <span id="player-timer-icon" class="text-base">⏱️</span>
+            <div>
+              <div id="player-timer-label" class="text-[10px] uppercase tracking-wider text-cyan-300/80 font-bold leading-none">
+                Tempo
+              </div>
+              <div id="player-timer-display" class="font-mono-game text-base sm:text-lg font-extrabold text-cyan-300 tracking-wider leading-tight">
+                00:00
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botões de Ação: Dicas, Relatório PDF, Reiniciar e Admin -->
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Poderes de Dica (se permitidos pelo Admin) -->
+          <div id="player-hints-group" class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onclick="revealCurrentLetter()"
+              class="game-btn-3d px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-extrabold flex items-center gap-1.5"
+              title="Revela a letra da célula selecionada"
+            >
+              <span>🔎</span>
+              <span>Letra</span>
+            </button>
+
+            <button
+              type="button"
+              onclick="revealCurrentWord()"
+              class="game-btn-3d px-3 py-2 rounded-xl bg-orange-500 text-white text-xs font-extrabold flex items-center gap-1.5"
+              title="Revela toda a palavra ativa"
+            >
+              <span>💡</span>
+              <span>Palavra</span>
+            </button>
+          </div>
+
+          <!-- Botão Destacado para Salvar Relatório PDF -->
+          <button
+            type="button"
+            onclick="generatePerformancePdf()"
+            class="game-btn-3d px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white text-xs font-extrabold flex items-center gap-1.5"
+            title="Baixar relatório detalhado de acertos e erros em PDF"
+          >
+            <span>📄</span>
+            <span>Salvar PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="restartPlayerSession()"
+            class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition flex items-center gap-1"
+            title="Reiniciar partida"
+          >
+            <span>🔄</span>
+            <span class="hidden sm:inline">Reiniciar</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="requestSwitchToAdmin()"
+            class="px-2.5 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Voltar ao Painel do Administrador"
+          >
+            🔒 Admin
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Progresso Visual das Palavras Concluídas -->
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-xs font-bold">
+          <span class="text-slate-300 flex items-center gap-1.5">
+            <span>🎯</span>
+            <span>Progresso da Fase (Correção Automática Ativa)</span>
+          </span>
+          <span id="game-stats" class="font-mono-game text-emerald-400">
+            0/0 palavras (0%)
+          </span>
+        </div>
+        <div class="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+          <div
+            id="progress-bar-fill"
+            class="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-300"
+            style="width: 0%"
+          ></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Banner da Dica Ativa -->
+    <div id="active-clue-banner" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 text-white rounded-3xl p-4 shadow-lg shadow-indigo-950/60 border border-indigo-400/40 flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-indigo-200 mb-1">
+          <span id="active-clue-direction" class="bg-black/25 px-2.5 py-0.5 rounded-lg">HORIZONTAIS</span>
+          <span id="active-clue-number" class="bg-white/20 text-white px-2 py-0.5 rounded-lg">#1</span>
+          <span id="active-clue-length" class="bg-indigo-950/60 text-cyan-200 px-2.5 py-0.5 rounded-lg normal-case">
+            0 letras
+          </span>
+          <span id="active-clue-status-badge" class="hidden px-2.5 py-0.5 rounded-lg bg-emerald-500 text-slate-950 font-extrabold">
+            ✓ CONCLUÍDA
+          </span>
+        </div>
+        <p id="active-clue-text" class="font-game text-base sm:text-lg font-semibold leading-snug text-white">
+          Clique em uma célula da grade ou em uma dica abaixo para começar!
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onclick="toggleDirection()"
+        class="game-btn-3d shrink-0 px-3.5 py-2.5 rounded-2xl bg-slate-950/40 hover:bg-slate-950/60 text-xs font-extrabold transition border border-white/20 flex items-center gap-1.5"
+        title="Alternar entre Horizontal e Vertical"
+      >
+        <span>↕️</span>
+        <span class="hidden sm:inline">Girar</span>
+      </button>
+    </div>
+
+    <!-- Arena Principal: Tabuleiro + Dicas -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <!-- Container do Tabuleiro -->
+      <div class="lg:col-span-7 game-panel rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center min-h-[340px]">
+        <div id="grid-wrapper" class="w-full flex items-center justify-center overflow-x-auto py-2">
+          <!-- Grade gerada via JS -->
+        </div>
+
+        <!-- Input oculto para teclados virtuais móveis -->
+        <input
+          id="mobile-keyboard-proxy"
+          type="text"
+          inputmode="text"
+          autocapitalize="characters"
+          autocomplete="off"
+          aria-label="Entrada de letra da palavra cruzada"
+          class="sr-only"
+        />
+
+        <!-- Legenda Visual Arcade -->
+        <div class="mt-5 pt-3.5 border-t border-slate-800 w-full flex flex-wrap items-center justify-center gap-3 sm:gap-4 text-xs font-semibold text-slate-300">
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-md bg-indigo-500 inline-block shadow-sm"></span>
+            <span>Cursor</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-md bg-indigo-200 inline-block"></span>
+            <span>Palavra ativa</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-md bg-emerald-500 inline-block"></span>
+            <span>Certa (Travada)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-md bg-rose-500 inline-block"></span>
+            <span>Erro imediato</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-4 h-4 rounded-md bg-amber-400 inline-block"></span>
+            <span>Dica</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Listas de Dicas -->
+      <div class="lg:col-span-5 flex flex-col gap-4">
+        <!-- Dicas Horizontais -->
+        <div class="game-panel rounded-3xl p-4 sm:p-5">
+          <h3 class="font-game text-base font-bold uppercase tracking-wider text-indigo-300 mb-3 flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center text-sm">→</span>
+            <span>Horizontais</span>
+          </h3>
+          <ul id="clues-across" class="space-y-2 text-sm"></ul>
+        </div>
+
+        <!-- Dicas Verticais -->
+        <div class="game-panel rounded-3xl p-4 sm:p-5">
+          <h3 class="font-game text-base font-bold uppercase tracking-wider text-purple-300 mb-3 flex items-center gap-2">
+            <span class="w-7 h-7 rounded-xl bg-purple-500/20 border border-purple-400/30 text-purple-300 flex items-center justify-center text-sm">↓</span>
+            <span>Verticais</span>
+          </h3>
+          <ul id="clues-down" class="space-y-2 text-sm"></ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL DE PIN DO ADMINISTRADOR                                           -->
+  <!-- ======================================================================= -->
+  <div id="pin-modal" class="no-print hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="game-panel rounded-3xl max-w-sm w-full p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center text-xl">
+          🔒
+        </div>
+        <div>
+          <h3 class="font-game text-lg font-bold text-white">Área do Administrador</h3>
+          <p class="text-xs text-slate-400">Digite o PIN para desbloquear o editor.</p>
+        </div>
+      </div>
+
+      <form onsubmit="verifyAdminPin(event)" class="space-y-3">
+        <input
+          id="pin-verify-input"
+          type="password"
+          inputmode="numeric"
+          placeholder="••••"
+          class="w-full px-4 py-3 text-center font-mono-game text-xl font-bold tracking-widest rounded-2xl border border-slate-700 bg-slate-950 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <p id="pin-error-msg" class="hidden text-xs font-bold text-rose-400 text-center">
+          PIN incorreto. Tente novamente.
+        </p>
+        <div class="flex items-center gap-2.5 pt-1">
+          <button
+            type="button"
+            onclick="closePinModal()"
+            class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold transition"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="game-btn-3d flex-1 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold"
+          >
+            Desbloquear
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODAL DE RESULTADO (VITÓRIA OU TEMPO ESGOTADO + BOTÃO PDF)              -->
+  <!-- ======================================================================= -->
+  <div id="endgame-modal" class="no-print hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="game-panel rounded-3xl max-w-md w-full p-6 text-center space-y-4">
+      <div id="endgame-icon" class="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/30">
+        🏆
+      </div>
+      <div>
+        <h3 id="endgame-title" class="font-game text-2xl font-bold text-white">
+          Fase Concluída!
+        </h3>
+        <p id="endgame-subtitle" class="text-sm text-slate-300 mt-1">
+          Você completou todas as palavras cruzadas!
+        </p>
+      </div>
+
+      <!-- Resumo Rápido no Modal -->
+      <div class="grid grid-cols-3 gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-3">
+        <div>
+          <div class="text-[10px] font-bold uppercase text-slate-400">Pontos</div>
+          <div id="endgame-score-value" class="font-mono-game text-lg font-extrabold text-amber-400">0</div>
+        </div>
+        <div>
+          <div class="text-[10px] font-bold uppercase text-slate-400">Acertos</div>
+          <div id="endgame-accuracy-value" class="font-mono-game text-lg font-extrabold text-emerald-400">0/0</div>
+        </div>
+        <div>
+          <div class="text-[10px] font-bold uppercase text-slate-400">Erros</div>
+          <div id="endgame-errors-value" class="font-mono-game text-lg font-extrabold text-rose-400">0</div>
+        </div>
+      </div>
+
+      <div id="endgame-time-card" class="hidden bg-slate-900/90 border border-cyan-500/30 rounded-2xl p-2.5">
+        <span class="text-xs font-bold uppercase tracking-wider text-cyan-300 mr-2">⏱️ Tempo:</span>
+        <span id="endgame-time-value" class="font-mono-game text-base font-extrabold text-white">00:00</span>
+      </div>
+
+      <!-- Botão Principal para Salvar Relatório PDF -->
+      <button
+        type="button"
+        onclick="generatePerformancePdf()"
+        class="game-btn-3d w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-game font-bold text-base flex items-center justify-center gap-2"
+      >
+        <span>📄</span>
+        <span>SALVAR RELATÓRIO DE DESEMPENHO (PDF)</span>
+      </button>
+
+      <div class="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+        <button
+          type="button"
+          onclick="closeEndgameModal()"
+          class="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold transition"
+        >
+          Ver Tabuleiro
+        </button>
+        <button
+          type="button"
+          onclick="closeEndgameModal(); restartPlayerSession();"
+          class="game-btn-3d w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 text-white text-xs sm:text-sm font-bold"
+        >
+          Jogar Novamente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * =========================================================================
+     * SISTEMA DE EFEITOS SONOROS SINTETIZADOS (WEB AUDIO API - ZERO URL EXTERNA)
+     * =========================================================================
+     */
+    let soundEnabled = true;
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+      return audioCtx;
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById('sound-icon');
+      const label = document.getElementById('sound-label');
+      icon.textContent = soundEnabled ? '🔊' : '🔇';
+      label.textContent = soundEnabled ? 'Som Ligado' : 'Mudo';
+      if (soundEnabled) playSound('click');
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      const ctx = getAudioContext();
+      if (!ctx) return;
+
+      const now = ctx.currentTime;
+
+      if (type === 'type') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.045);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      } else if (type === 'click') {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(420, now);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } else if (type === 'correct') {
+        // Arpejo ascendente alegre
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          const t = now + idx * 0.065;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.14, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.23);
+        });
+      } else if (type === 'error') {
+        // Tom duplo grave suave
+        const freqs = [220, 175];
+        freqs.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          const t = now + idx * 0.11;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.09, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.17);
+        });
+      } else if (type === 'victory') {
+        const fanfare = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+        fanfare.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          const t = now + idx * 0.1;
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.16, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.34);
+        });
+      }
+    }
+
+    /**
+     * =========================================================================
+     * CONFETES DE CELEBRAÇÃO (CANVAS)
+     * =========================================================================
+     */
+    function launchConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const colors = ['#34d399', '#818cf8', '#fbbf24', '#f472b6', '#38bdf8'];
+      const pieces = Array.from({ length: 95 }, () => ({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.4,
+        w: 7 + Math.random() * 7,
+        h: 5 + Math.random() * 5,
+        vx: -2.5 + Math.random() * 5,
+        vy: 3 + Math.random() * 4.5,
+        rot: Math.random() * Math.PI * 2,
+        vrot: -0.1 + Math.random() * 0.2,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      }));
+
+      let frames = 0;
+      function frame() {
+        frames++;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const p of pieces) {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.rot += p.vrot;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        }
+        if (frames < 180) {
+          requestAnimationFrame(frame);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      requestAnimationFrame(frame);
+    }
+
+    /**
+     * =========================================================================
+     * ESTADO GLOBAL, CONFIGURAÇÕES DO ADMIN E PERSISTÊNCIA
+     * =========================================================================
+     */
+    const STORAGE_KEY = 'palavras_cruzadas_arcade_v3';
+
+    const SAMPLE_SETS = {
+      brasil: [
+        { id: 'b1', clue: 'Maior bioma brasileiro, conhecido como o pulmão do mundo', answer: 'AMAZONIA' },
+        { id: 'b2', clue: 'Ritmo musical e dança típica do Carnaval brasileiro', answer: 'SAMBA' },
+        { id: 'b3', clue: 'Capital do Brasil inaugurada em 1960', answer: 'BRASILIA' },
+        { id: 'b4', clue: 'Esporte mais popular do país', answer: 'FUTEBOL' },
+        { id: 'b5', clue: 'Cidade brasileira famosa pelo Pão de Açúcar e Corcovado', answer: 'RIO' },
+        { id: 'b6', clue: 'Fruta tropical amarela muito comum no norte e nordeste', answer: 'MANGA' },
+        { id: 'b7', clue: 'Literatura popular em versos tradicional do Nordeste', answer: 'CORDEL' },
+        { id: 'b8', clue: 'Grande felino das Américas presente no Pantanal', answer: 'ONCA' }
+      ],
+      ciencia: [
+        { id: 'c1', clue: 'Estrela central do nosso sistema solar', answer: 'SOL' },
+        { id: 'c2', clue: 'Gás essencial para a respiração celular dos seres vivos', answer: 'OXIGENIO' },
+        { id: 'c3', clue: 'Planeta conhecido como o Planeta Vermelho', answer: 'MARTE' },
+        { id: 'c4', clue: 'Processo pelo qual plantas produzem alimento com luz solar', answer: 'FOTOSSINTESE' },
+        { id: 'c5', clue: 'Unidade básica da vida em todos os organismos', answer: 'CELULA' },
+        { id: 'c6', clue: 'Força que mantém os planetas em órbita ao redor do Sol', answer: 'GRAVIDADE' },
+        { id: 'c7', clue: 'Substância vital formada por hidrogênio e oxigênio', answer: 'AGUA' }
+      ]
+    };
+
+    let gameConfig = {
+      title: 'Desafio de Palavras Cruzadas',
+      timerEnabled: false,
+      timerMode: 'progressive',
+      timerMinutes: 5,
+      timerSeconds: 0,
+      allowHints: true,
+      adminPin: ''
+    };
+
+    let wordPairs = SAMPLE_SETS.brasil.map(item => ({ ...item }));
+    let activeRole = 'admin';
+    let editingPairId = null;
+
+    let puzzleData = {
+      rows: 0,
+      cols: 0,
+      grid: [],
+      placements: [],
+      unplaced: []
+    };
+
+    // Estado completo da sessão do jogador (incluindo métricas para correção instantânea e PDF)
+    let playerState = {
+      playerName: '',
+      selectedRow: null,
+      selectedCol: null,
+      direction: 'across',
+      inputs: {},            // "r,c" -> letra digitada
+      lockedCells: {},       // "r,c" -> true (quando pertence a uma palavra já acertada)
+      cellStatuses: {},      // "r,c" -> 'correct' | 'wrong' | 'revealed'
+      animatingCells: {},    // "r,c" -> 'anim-pop' | 'anim-celebrate' | 'anim-shake'
+      solvedPlacements: {},  // placementId -> true
+      wordStats: {},         // placementId -> { attempts, wrongAttempts, lastWrongAttemptWord, hintsUsed, solved, revealedByHint }
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      totalWrongAttempts: 0,
+      totalHintsUsed: 0,
+      isLocked: false,
+      isCompleted: false,
+      endReason: null        // 'completed' | 'timeout' | null
+    };
+
+    let timerState = {
+      intervalId: null,
+      running: false,
+      elapsedSeconds: 0,
+      remainingSeconds: 300
+    };
+
+    /**
+     * =========================================================================
+     * PERSISTÊNCIA EM LOCALSTORAGE E JSON
+     * =========================================================================
+     */
+    function saveStateToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ gameConfig, wordPairs }));
+      } catch (err) {}
+    }
+
+    function loadStateFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.gameConfig) gameConfig = { ...gameConfig, ...parsed.gameConfig };
+          if (Array.isArray(parsed.wordPairs)) wordPairs = parsed.wordPairs;
+        }
+      } catch (err) {}
+    }
+
+    function syncAdminFormFromConfig() {
+      document.getElementById('admin-game-title').value = gameConfig.title || '';
+      document.getElementById('admin-timer-enabled').checked = !!gameConfig.timerEnabled;
+      document.getElementById('admin-allow-hints').checked = gameConfig.allowHints !== false;
+      document.getElementById('admin-pin-input').value = gameConfig.adminPin || '';
+      document.getElementById('admin-timer-minutes').value = Number.isFinite(gameConfig.timerMinutes) ? gameConfig.timerMinutes : 5;
+      document.getElementById('admin-timer-seconds').value = Number.isFinite(gameConfig.timerSeconds) ? gameConfig.timerSeconds : 0;
+
+      document.querySelectorAll('input[name="timer-mode"]').forEach(r => {
+        r.checked = r.value === gameConfig.timerMode;
+      });
+
+      updateAdminConfigVisibility();
+      updateHeaderTitle();
+    }
+
+    function updateAdminConfigVisibility() {
+      const timerOptions = document.getElementById('admin-timer-options');
+      const countdownInputs = document.getElementById('admin-countdown-inputs');
+      const pinStatus = document.getElementById('admin-pin-status');
+
+      timerOptions.classList.toggle('hidden', !gameConfig.timerEnabled);
+      countdownInputs.classList.toggle('hidden', !(gameConfig.timerEnabled && gameConfig.timerMode === 'countdown'));
+
+      if (gameConfig.adminPin && gameConfig.adminPin.trim().length > 0) {
+        pinStatus.textContent = 'PIN ativo 🔒';
+        pinStatus.className = 'text-[11px] font-bold text-indigo-300';
+      } else {
+        pinStatus.textContent = 'Sem bloqueio';
+        pinStatus.className = 'text-[11px] font-semibold text-slate-400';
+      }
+    }
+
+    function handleConfigChange() {
+      gameConfig.title = document.getElementById('admin-game-title').value.trim() || 'Palavras Cruzadas';
+      gameConfig.timerEnabled = document.getElementById('admin-timer-enabled').checked;
+
+      const selectedMode = document.querySelector('input[name="timer-mode"]:checked');
+      gameConfig.timerMode = selectedMode ? selectedMode.value : 'progressive';
+
+      gameConfig.timerMinutes = Math.max(0, Math.min(180, parseInt(document.getElementById('admin-timer-minutes').value, 10) || 0));
+      gameConfig.timerSeconds = Math.max(0, Math.min(59, parseInt(document.getElementById('admin-timer-seconds').value, 10) || 0));
+      gameConfig.allowHints = document.getElementById('admin-allow-hints').checked;
+      gameConfig.adminPin = document.getElementById('admin-pin-input').value.trim();
+
+      updateAdminConfigVisibility();
+      updateHeaderTitle();
+      saveStateToStorage();
+    }
+
+    function handlePlayerNameChange() {
+      playerState.playerName = document.getElementById('player-name-input').value.trim();
+    }
+
+    function updateHeaderTitle() {
+      document.getElementById('header-game-title').textContent = gameConfig.title || 'Palavras Cruzadas';
+    }
+
+    function exportConfigJson() {
+      const data = {
+        version: 3,
+        exportedAt: new Date().toISOString(),
+        gameConfig,
+        wordPairs
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const slug = normalizeWord(gameConfig.title || 'palavras_cruzadas').toLowerCase() || 'palavras_cruzadas';
+      a.href = url;
+      a.download = `${slug}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Fase exportada em JSON com sucesso!', 'success');
+    }
+
+    function importConfigJson(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!parsed || !Array.isArray(parsed.wordPairs)) {
+            showToast('Arquivo JSON inválido.', 'error');
+            return;
+          }
+          if (parsed.gameConfig) gameConfig = { ...gameConfig, ...parsed.gameConfig };
+          wordPairs = parsed.wordPairs
+            .map((item, idx) => ({
+              id: item.id || `imp_${idx}_${Date.now()}`,
+              clue: String(item.clue || '').trim(),
+              answer: formatDisplayAnswer(item.answer || '')
+            }))
+            .filter(item => item.clue && normalizeWord(item.answer).length >= 2);
+
+          syncAdminFormFromConfig();
+          renderPairsList();
+          generateCrossword();
+          saveStateToStorage();
+          showToast('Fase importada com sucesso!', 'success');
+        } catch (err) {
+          showToast('Erro ao ler o arquivo JSON.', 'error');
+        } finally {
+          event.target.value = '';
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    /**
+     * =========================================================================
+     * NORMALIZAÇÃO E TOASTS
+     * =========================================================================
+     */
+    function normalizeWord(str) {
+      if (!str) return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z]/g, '');
+    }
+
+    function formatDisplayAnswer(str) {
+      return (str || '').trim().toUpperCase();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const styles = {
+        info: 'bg-indigo-950/90 text-indigo-200 border-indigo-500/40',
+        success: 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40',
+        warning: 'bg-amber-950/90 text-amber-200 border-amber-500/40',
+        error: 'bg-rose-950/90 text-rose-200 border-rose-500/40'
+      };
+      const icons = { info: 'ℹ️', success: '🎉', warning: '⚠️', error: '💥' };
+
+      container.innerHTML = `
+        <div class="flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl border text-xs sm:text-sm font-semibold shadow-lg ${styles[type] || styles.info}">
+          <div class="flex items-center gap-2">
+            <span>${icons[type] || icons.info}</span>
+            <span>${escapeHtml(message)}</span>
+          </div>
+          <button type="button" onclick="this.parentElement.remove()" class="text-current opacity-60 hover:opacity-100 font-bold px-1">
+            ✕
+          </button>
+        </div>
+      `;
+
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        if (container) container.innerHTML = '';
+      }, 4200);
+    }
+
+    /**
+     * =========================================================================
+     * NAVEGAÇÃO ENTRE PAINEL DO ADMINISTRADOR E ARENA DO JOGADOR
+     * =========================================================================
+     */
+    function requestSwitchToAdmin() {
+      if (activeRole === 'admin') return;
+      if (gameConfig.adminPin && gameConfig.adminPin.trim().length > 0) {
+        openPinModal();
+      } else {
+        activateAdminMode();
+      }
+    }
+
+    function openPinModal() {
+      const modal = document.getElementById('pin-modal');
+      const input = document.getElementById('pin-verify-input');
+      document.getElementById('pin-error-msg').classList.add('hidden');
+      input.value = '';
+      modal.classList.remove('hidden');
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function closePinModal() {
+      document.getElementById('pin-modal').classList.add('hidden');
+    }
+
+    function verifyAdminPin(event) {
+      event.preventDefault();
+      const input = document.getElementById('pin-verify-input');
+      if (input.value.trim() === gameConfig.adminPin.trim()) {
+        closePinModal();
+        activateAdminMode();
+      } else {
+        document.getElementById('pin-error-msg').classList.remove('hidden');
+        input.select();
+      }
+    }
+
+    function activateAdminMode() {
+      stopTimer();
+      activeRole = 'admin';
+
+      const tabAdmin = document.getElementById('tab-admin');
+      const tabPlayer = document.getElementById('tab-player');
+
+      tabAdmin.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md';
+      tabPlayer.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+
+      document.getElementById('view-admin').classList.remove('hidden');
+      document.getElementById('view-player').classList.add('hidden');
+      document.getElementById('view-player').classList.remove('flex');
+
+      document.getElementById('header-subtitle').textContent = 'Modo Administrador — Crie e configure sua fase';
+      renderAdminPreview();
+    }
+
+    function saveAndGoToPlayer() {
+      handleConfigChange();
+      if (wordPairs.length === 0) {
+        showToast('Adicione pelo menos uma palavra antes de iniciar a partida.', 'warning');
+        return;
+      }
+      switchToPlayerMode();
+    }
+
+    function switchToPlayerMode() {
+      if (puzzleData.placements.length === 0) {
+        generateCrossword();
+      }
+      if (puzzleData.placements.length === 0) {
+        showToast('Cadastre palavras válidas no Painel do Administrador.', 'warning');
+        return;
+      }
+
+      activeRole = 'player';
+      playSound('click');
+
+      const tabAdmin = document.getElementById('tab-admin');
+      const tabPlayer = document.getElementById('tab-player');
+
+      tabPlayer.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md';
+      tabAdmin.className = 'px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+
+      document.getElementById('view-admin').classList.add('hidden');
+      document.getElementById('view-player').classList.remove('hidden');
+      document.getElementById('view-player').classList.add('flex');
+
+      document.getElementById('header-subtitle').textContent = 'Arena do Jogador — Correção instantânea ativa!';
+
+      const hintsGroup = document.getElementById('player-hints-group');
+      hintsGroup.classList.toggle('hidden', !gameConfig.allowHints);
+      hintsGroup.classList.toggle('flex', !!gameConfig.allowHints);
+
+      if (!timerState.running && !playerState.isLocked) {
+        setupPlayerTimer();
+      }
+      refreshGameView();
+    }
+
+    /**
+     * =========================================================================
+     * CRONÔMETRO
+     * =========================================================================
+     */
+    function formatSeconds(totalSec) {
+      const safe = Math.max(0, Math.floor(totalSec));
+      const mins = Math.floor(safe / 60);
+      const secs = safe % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function getElapsedTimeFormatted() {
+      if (!gameConfig.timerEnabled) {
+        return formatSeconds(timerState.elapsedSeconds) + ' (livre)';
+      }
+      if (gameConfig.timerMode === 'countdown') {
+        const initialTotal = (gameConfig.timerMinutes * 60) + gameConfig.timerSeconds;
+        const spent = Math.max(0, initialTotal - timerState.remainingSeconds);
+        return `${formatSeconds(spent)} de ${formatSeconds(initialTotal)}`;
+      }
+      return formatSeconds(timerState.elapsedSeconds);
+    }
+
+    function setupPlayerTimer() {
+      stopTimer();
+      const timerBox = document.getElementById('player-timer-box');
+      const timerLabel = document.getElementById('player-timer-label');
+      const timerDisplay = document.getElementById('player-timer-display');
+
+      timerState.elapsedSeconds = 0;
+
+      if (!gameConfig.timerEnabled) {
+        timerBox.classList.add('hidden');
+        timerBox.classList.remove('flex');
+        startBackgroundClock();
+        return;
+      }
+
+      timerBox.classList.remove('hidden', 'border-rose-500', 'animate-pulse');
+      timerBox.classList.add('flex', 'border-cyan-500/40');
+      timerDisplay.className = 'font-mono-game text-base sm:text-lg font-extrabold text-cyan-300 tracking-wider leading-tight';
+
+      if (gameConfig.timerMode === 'countdown') {
+        const total = (gameConfig.timerMinutes * 60) + gameConfig.timerSeconds;
+        timerState.remainingSeconds = total > 0 ? total : 60;
+        timerLabel.textContent = 'Restante';
+        timerDisplay.textContent = formatSeconds(timerState.remainingSeconds);
+      } else {
+        timerLabel.textContent = 'Tempo';
+        timerDisplay.textContent = formatSeconds(0);
+      }
+
+      startTimer();
+    }
+
+    function startBackgroundClock() {
+      // Conta o tempo mesmo sem cronômetro visível para registrar no relatório PDF
+      if (timerState.running || playerState.isLocked) return;
+      timerState.running = true;
+      timerState.intervalId = setInterval(() => {
+        if (!timerState.running || activeRole !== 'player') return;
+        timerState.elapsedSeconds++;
+      }, 1000);
+    }
+
+    function startTimer() {
+      if (timerState.running || playerState.isLocked) return;
+      timerState.running = true;
+
+      timerState.intervalId = setInterval(() => {
+        if (!timerState.running || activeRole !== 'player') return;
+
+        timerState.elapsedSeconds++;
+        const timerBox = document.getElementById('player-timer-box');
+        const timerDisplay = document.getElementById('player-timer-display');
+
+        if (gameConfig.timerMode === 'countdown') {
+          timerState.remainingSeconds--;
+          timerDisplay.textContent = formatSeconds(timerState.remainingSeconds);
+
+          if (timerState.remainingSeconds <= 30 && timerState.remainingSeconds > 0) {
+            timerBox.classList.remove('border-cyan-500/40');
+            timerBox.classList.add('border-rose-500', 'animate-pulse');
+            timerDisplay.className = 'font-mono-game text-base sm:text-lg font-extrabold text-rose-400 tracking-wider leading-tight';
+          }
+
+          if (timerState.remainingSeconds <= 0) {
+            stopTimer();
+            handleTimeExpired();
+          }
+        } else {
+          timerDisplay.textContent = formatSeconds(timerState.elapsedSeconds);
+        }
+      }, 1000);
+    }
+
+    function stopTimer() {
+      timerState.running = false;
+      if (timerState.intervalId) {
+        clearInterval(timerState.intervalId);
+        timerState.intervalId = null;
+      }
+    }
+
+    function handleTimeExpired() {
+      playerState.isLocked = true;
+      playerState.endReason = 'timeout';
+      playSound('error');
+      openEndgameModal(false);
+    }
+
+    /**
+     * =========================================================================
+     * CRUD DE PERGUNTAS E RESPOSTAS (ADMIN)
+     * =========================================================================
+     */
+    function updateLiveAnswerPreview() {
+      const input = document.getElementById('input-answer');
+      const preview = document.getElementById('live-answer-preview');
+      const normalized = normalizeWord(input.value);
+
+      if (!normalized) {
+        preview.textContent = '0 letras';
+        preview.className = 'text-[11px] font-mono-game text-slate-400';
+        return;
+      }
+      preview.textContent = `${normalized} (${normalized.length})`;
+      preview.className = 'text-[11px] font-mono-game font-bold text-emerald-400';
+    }
+
+    function handlePairSubmit(event) {
+      event.preventDefault();
+      const clueInput = document.getElementById('input-clue');
+      const answerInput = document.getElementById('input-answer');
+
+      const clue = clueInput.value.trim();
+      const rawAnswer = formatDisplayAnswer(answerInput.value);
+      const normalized = normalizeWord(rawAnswer);
+
+      if (!clue) {
+        showToast('Por favor, informe uma pergunta ou dica.', 'warning');
+        clueInput.focus();
+        return;
+      }
+      if (normalized.length < 2) {
+        showToast('A resposta deve ter pelo menos 2 letras.', 'warning');
+        answerInput.focus();
+        return;
+      }
+
+      if (editingPairId) {
+        wordPairs = wordPairs.map(item =>
+          item.id === editingPairId ? { ...item, clue, answer: rawAnswer } : item
+        );
+        showToast(`Palavra "${normalized}" atualizada!`, 'success');
+        cancelEditPair();
+      } else {
+        const newId = 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+        wordPairs.push({ id: newId, clue, answer: rawAnswer });
+        clueInput.value = '';
+        answerInput.value = '';
+        updateLiveAnswerPreview();
+        showToast(`Palavra "${normalized}" adicionada!`, 'success');
+      }
+
+      saveStateToStorage();
+      renderPairsList();
+      generateCrossword();
+    }
+
+    function startEditPair(id) {
+      const pair = wordPairs.find(p => p.id === id);
+      if (!pair) return;
+      editingPairId = id;
+      document.getElementById('input-clue').value = pair.clue;
+      document.getElementById('input-answer').value = pair.answer;
+      updateLiveAnswerPreview();
+
+      document.getElementById('form-mode-label').textContent = 'Editando palavra selecionada';
+      document.getElementById('submit-pair-text').textContent = 'Salvar Alterações';
+      document.getElementById('cancel-edit-btn').classList.remove('hidden');
+      document.getElementById('input-clue').focus();
+    }
+
+    function cancelEditPair() {
+      editingPairId = null;
+      document.getElementById('input-clue').value = '';
+      document.getElementById('input-answer').value = '';
+      updateLiveAnswerPreview();
+
+      document.getElementById('form-mode-label').textContent = 'Adicionar nova palavra';
+      document.getElementById('submit-pair-text').textContent = 'Adicionar à Fase';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+    }
+
+    function removePair(id) {
+      wordPairs = wordPairs.filter(p => p.id !== id);
+      if (editingPairId === id) cancelEditPair();
+      saveStateToStorage();
+      renderPairsList();
+      generateCrossword();
+    }
+
+    function loadSampleSet(setName) {
+      const sample = SAMPLE_SETS[setName];
+      if (!sample) return;
+      cancelEditPair();
+      wordPairs = sample.map((item, idx) => ({
+        id: `${setName}_${idx}_${Date.now()}`,
+        clue: item.clue,
+        answer: item.answer
+      }));
+      saveStateToStorage();
+      renderPairsList();
+      generateCrossword();
+      showToast('Fase carregada e tabuleiro atualizado!', 'success');
+    }
+
+    function requestClearAllPairs() {
+      cancelEditPair();
+      wordPairs = [];
+      saveStateToStorage();
+      renderPairsList();
+      generateCrossword();
+      showToast('Todas as palavras foram removidas.', 'info');
+    }
+
+    function renderPairsList() {
+      const listEl = document.getElementById('pairs-list');
+      const badgeEl = document.getElementById('word-count-badge');
+      badgeEl.textContent = `${wordPairs.length} ${wordPairs.length === 1 ? 'palavra' : 'palavras'}`;
+
+      if (wordPairs.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-8 px-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 text-sm">
+            Nenhuma palavra cadastrada ainda. Use o formulário acima ou carregue uma fase pronta.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = wordPairs
+        .map(pair => {
+          const norm = normalizeWord(pair.answer);
+          const isEditing = editingPairId === pair.id;
+          return `
+            <div class="p-3 rounded-2xl border transition flex items-start justify-between gap-3 ${
+              isEditing
+                ? 'bg-indigo-950/60 border-indigo-400'
+                : 'bg-slate-900/75 hover:bg-slate-900 border-slate-800'
+            }">
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <span class="font-mono-game font-bold text-xs sm:text-sm text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 rounded-lg">
+                    ${escapeHtml(norm)}
+                  </span>
+                  <span class="text-xs font-semibold text-slate-400">
+                    ${norm.length} letras
+                  </span>
+                </div>
+                <p class="text-xs sm:text-sm text-slate-200 leading-snug">
+                  ${escapeHtml(pair.clue)}
+                </p>
+              </div>
+
+              <div class="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onclick="startEditPair('${pair.id}')"
+                  class="p-1.5 rounded-xl text-slate-400 hover:text-indigo-300 hover:bg-indigo-500/20 transition text-sm"
+                  title="Editar"
+                >
+                  ✏️
+                </button>
+                <button
+                  type="button"
+                  onclick="removePair('${pair.id}')"
+                  class="p-1.5 rounded-xl text-slate-400 hover:text-rose-300 hover:bg-rose-500/20 transition text-sm"
+                  title="Remover"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        })
+        .join('');
+    }
+
+    /**
+     * =========================================================================
+     * GERAÇÃO DA GRADE DE PALAVRAS CRUZADAS
+     * =========================================================================
+     */
+    function resetPlayerSessionData() {
+      playerState.inputs = {};
+      playerState.lockedCells = {};
+      playerState.cellStatuses = {};
+      playerState.animatingCells = {};
+      playerState.solvedPlacements = {};
+      playerState.wordStats = {};
+      playerState.score = 0;
+      playerState.combo = 0;
+      playerState.maxCombo = 0;
+      playerState.totalWrongAttempts = 0;
+      playerState.totalHintsUsed = 0;
+      playerState.isLocked = false;
+      playerState.isCompleted = false;
+      playerState.endReason = null;
+
+      puzzleData.placements.forEach(p => {
+        playerState.wordStats[p.placementId] = {
+          attempts: 0,
+          wrongAttempts: 0,
+          lastWrongAttemptWord: '',
+          hintsUsed: 0,
+          solved: false,
+          revealedByHint: false
+        };
+      });
+    }
+
+    function generateCrossword(notifyUser = false) {
+      const validItems = wordPairs
+        .map(p => ({
+          id: p.id,
+          clue: p.clue,
+          displayAnswer: formatDisplayAnswer(p.answer),
+          word: normalizeWord(p.answer)
+        }))
+        .filter(p => p.word.length >= 2);
+
+      if (validItems.length === 0) {
+        puzzleData = { rows: 0, cols: 0, grid: [], placements: [], unplaced: [] };
+        resetPlayerSessionData();
+        renderAdminPreview();
+        refreshGameView();
+        return;
+      }
+
+      const sorted = [...validItems].sort((a, b) => {
+        if (b.word.length !== a.word.length) return b.word.length - a.word.length;
+        return Math.random() - 0.5;
+      });
+
+      const board = new Map();
+      const placed = [];
+      const unplaced = [];
+
+      const keyOf = (r, c) => `${r},${c}`;
+      const getCell = (r, c) => board.get(keyOf(r, c)) || null;
+
+      function canPlaceWord(word, startR, startC, dir) {
+        const dr = dir === 'down' ? 1 : 0;
+        const dc = dir === 'across' ? 1 : 0;
+        const len = word.length;
+
+        if (getCell(startR - dr, startC - dc)) return { ok: false, crossings: 0 };
+        if (getCell(startR + dr * len, startC + dc * len)) return { ok: false, crossings: 0 };
+
+        let crossings = 0;
+        for (let i = 0; i < len; i++) {
+          const r = startR + dr * i;
+          const c = startC + dc * i;
+          const existing = getCell(r, c);
+          const ch = word[i];
+
+          if (existing) {
+            if (existing.letter !== ch) return { ok: false, crossings: 0 };
+            if (dir === 'across' && existing.acrossId) return { ok: false, crossings: 0 };
+            if (dir === 'down' && existing.downId) return { ok: false, crossings: 0 };
+            crossings++;
+          } else {
+            const perpR1 = dir === 'across' ? r - 1 : r;
+            const perpC1 = dir === 'across' ? c : c - 1;
+            const perpR2 = dir === 'across' ? r + 1 : r;
+            const perpC2 = dir === 'across' ? c : c + 1;
+            if (getCell(perpR1, perpC1) || getCell(perpR2, perpC2)) return { ok: false, crossings: 0 };
+          }
+        }
+        return { ok: true, crossings };
+      }
+
+      function commitWord(item, startR, startC, dir) {
+        const dr = dir === 'down' ? 1 : 0;
+        const dc = dir === 'across' ? 1 : 0;
+        const id = 'p_' + Math.random().toString(36).slice(2, 8);
+        const cells = [];
+
+        for (let i = 0; i < item.word.length; i++) {
+          const r = startR + dr * i;
+          const c = startC + dc * i;
+          const k = keyOf(r, c);
+          const prev = board.get(k) || { letter: item.word[i], acrossId: null, downId: null };
+          if (dir === 'across') prev.acrossId = id;
+          else prev.downId = id;
+          board.set(k, prev);
+          cells.push({ r, c });
+        }
+
+        placed.push({
+          ...item,
+          placementId: id,
+          row: startR,
+          col: startC,
+          dir,
+          cells,
+          number: 0
+        });
+      }
+
+      commitWord(sorted[0], 0, 0, 'across');
+
+      for (let idx = 1; idx < sorted.length; idx++) {
+        const item = sorted[idx];
+        const word = item.word;
+        let bestCandidate = null;
+
+        for (const p of placed) {
+          for (let i = 0; i < word.length; i++) {
+            const ch = word[i];
+            for (let j = 0; j < p.word.length; j++) {
+              if (p.word[j] !== ch) continue;
+              const newDir = p.dir === 'across' ? 'down' : 'across';
+              const interR = p.row + (p.dir === 'down' ? j : 0);
+              const interC = p.col + (p.dir === 'across' ? j : 0);
+              const startR = newDir === 'down' ? interR - i : interR;
+              const startC = newDir === 'across' ? interC - i : interC;
+
+              const check = canPlaceWord(word, startR, startC, newDir);
+              if (check.ok) {
+                const distPenalty = Math.abs(startR) + Math.abs(startC);
+                const score = check.crossings * 100 - distPenalty;
+                if (!bestCandidate || score > bestCandidate.score) {
+                  bestCandidate = { startR, startC, newDir, score };
+                }
+              }
+            }
+          }
+        }
+
+        if (bestCandidate) {
+          commitWord(item, bestCandidate.startR, bestCandidate.startC, bestCandidate.newDir);
+        } else {
+          let fallbackPlaced = false;
+          for (let r = -25; r <= 25 && !fallbackPlaced; r++) {
+            for (let c = -25; c <= 25 && !fallbackPlaced; c++) {
+              for (const dir of ['across', 'down']) {
+                const check = canPlaceWord(word, r, c, dir);
+                if (check.ok) {
+                  let nearExisting = false;
+                  const dr = dir === 'down' ? 1 : 0;
+                  const dc = dir === 'across' ? 1 : 0;
+                  for (let k = 0; k < word.length && !nearExisting; k++) {
+                    const cr = r + dr * k;
+                    const cc = c + dc * k;
+                    for (let nr = cr - 2; nr <= cr + 2 && !nearExisting; nr++) {
+                      for (let nc = cc - 2; nc <= cc + 2; nc++) {
+                        if (getCell(nr, nc)) {
+                          nearExisting = true;
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  if (nearExisting) {
+                    commitWord(item, r, c, dir);
+                    fallbackPlaced = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (!fallbackPlaced) unplaced.push(item);
+        }
+      }
+
+      let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+      for (const p of placed) {
+        for (const cell of p.cells) {
+          if (cell.r < minR) minR = cell.r;
+          if (cell.r > maxR) maxR = cell.r;
+          if (cell.c < minC) minC = cell.c;
+          if (cell.c > maxC) maxC = cell.c;
+        }
+      }
+
+      const rows = maxR - minR + 1;
+      const cols = maxC - minC + 1;
+      const grid = Array.from({ length: rows }, () => Array(cols).fill(null));
+
+      for (const p of placed) {
+        p.row -= minR;
+        p.col -= minC;
+        p.cells = p.cells.map(cell => ({ r: cell.r - minR, c: cell.c - minC }));
+
+        for (let i = 0; i < p.word.length; i++) {
+          const { r, c } = p.cells[i];
+          if (!grid[r][c]) {
+            grid[r][c] = {
+              row: r,
+              col: c,
+              letter: p.word[i],
+              number: null,
+              acrossId: null,
+              downId: null
+            };
+          }
+          if (p.dir === 'across') grid[r][c].acrossId = p.placementId;
+          else grid[r][c].downId = p.placementId;
+        }
+      }
+
+      const startMap = new Map();
+      for (const p of placed) {
+        const k = `${p.row},${p.col}`;
+        if (!startMap.has(k)) startMap.set(k, { r: p.row, c: p.col, words: [] });
+        startMap.get(k).words.push(p);
+      }
+
+      const sortedStarts = Array.from(startMap.values()).sort((a, b) =>
+        a.r !== b.r ? a.r - b.r : a.c - b.c
+      );
+
+      sortedStarts.forEach((entry, index) => {
+        const num = index + 1;
+        grid[entry.r][entry.c].number = num;
+        entry.words.forEach(w => { w.number = num; });
+      });
+
+      placed.sort((a, b) => a.number - b.number);
+      puzzleData = { rows, cols, grid, placements: placed, unplaced };
+      resetPlayerSessionData();
+
+      if (placed.length > 0) {
+        playerState.selectedRow = placed[0].row;
+        playerState.selectedCol = placed[0].col;
+        playerState.direction = placed[0].dir;
+      }
+
+      renderAdminPreview();
+      refreshGameView();
+
+      if (notifyUser) {
+        showToast('Nova disposição de tabuleiro gerada!', 'success');
+      }
+    }
+
+    /**
+     * =========================================================================
+     * PRÉ-VISUALIZAÇÃO DO GABARITO NO PAINEL DO ADMINISTRADOR
+     * =========================================================================
+     */
+    function renderAdminPreview() {
+      const wrapper = document.getElementById('admin-preview-wrapper');
+      const warnBox = document.getElementById('admin-unplaced-warning');
+
+      if (puzzleData.unplaced.length > 0) {
+        warnBox.classList.remove('hidden');
+        warnBox.textContent = `⚠️ Palavras sem cruzamento possível: ${puzzleData.unplaced.map(u => u.word).join(', ')}.`;
+      } else {
+        warnBox.classList.add('hidden');
+      }
+
+      if (!puzzleData.rows || !puzzleData.cols || puzzleData.placements.length === 0) {
+        wrapper.innerHTML = `<span class="text-xs text-slate-400 px-4 text-center">Cadastre palavras à direita para visualizar o gabarito.</span>`;
+        return;
+      }
+
+      const cellSize = puzzleData.cols > 12 ? '24px' : '28px';
+      let html = `<div class="crossword-grid" style="grid-template-columns: repeat(${puzzleData.cols}, ${cellSize});">`;
+
+      for (let r = 0; r < puzzleData.rows; r++) {
+        for (let c = 0; c < puzzleData.cols; c++) {
+          const cell = puzzleData.grid[r][c];
+          if (!cell) {
+            html += `<div class="cell-void" style="aspect-ratio: 1 / 1;"></div>`;
+          } else {
+            html += `
+              <div class="cell-preview" style="aspect-ratio: 1 / 1;">
+                ${cell.number ? `<span class="cell-number" style="font-size: 9px;">${cell.number}</span>` : ''}
+                <span>${escapeHtml(cell.letter)}</span>
+              </div>
+            `;
+          }
+        }
+      }
+
+      html += `</div>`;
+      wrapper.innerHTML = html;
+    }
+
+    /**
+     * =========================================================================
+     * CORREÇÃO INSTANTÂNEA EM TEMPO REAL POR PALAVRA
+     * =========================================================================
+     */
+    function triggerCellAnimation(cells, animClass) {
+      cells.forEach(({ r, c }) => {
+        const key = `${r},${c}`;
+        playerState.animatingCells[key] = animClass;
+      });
+      setTimeout(() => {
+        cells.forEach(({ r, c }) => {
+          delete playerState.animatingCells[`${r},${c}`];
+        });
+        renderGrid();
+      }, 600);
+    }
+
+    function evaluateWordsAffectedByCell(r, c) {
+      const cell = puzzleData.grid[r]?.[c];
+      if (!cell) return;
+
+      const candidateIds = [cell.acrossId, cell.downId].filter(Boolean);
+      let anySolvedNow = false;
+      let anyErrorNow = false;
+
+      for (const pid of candidateIds) {
+        if (playerState.solvedPlacements[pid]) continue;
+
+        const placement = puzzleData.placements.find(p => p.placementId === pid);
+        if (!placement) continue;
+
+        // Verifica se TODAS as letras desta palavra já estão preenchidas
+        let isFull = true;
+        let typedWord = '';
+        for (const cl of placement.cells) {
+          const ch = playerState.inputs[`${cl.r},${cl.c}`] || '';
+          if (!ch) {
+            isFull = false;
+            break;
+          }
+          typedWord += ch;
+        }
+
+        if (!isFull) {
+          // Limpa marcação de erro antiga nas células não travadas desta palavra enquanto edita
+          placement.cells.forEach(cl => {
+            const k = `${cl.r},${cl.c}`;
+            if (!playerState.lockedCells[k] && playerState.cellStatuses[k] === 'wrong') {
+              delete playerState.cellStatuses[k];
+            }
+          });
+          continue;
+        }
+
+        const stats = playerState.wordStats[pid];
+        stats.attempts++;
+
+        if (typedWord === placement.word) {
+          // ACERTOU A PALAVRA NA HORA!
+          playerState.solvedPlacements[pid] = true;
+          stats.solved = true;
+          anySolvedNow = true;
+
+          // Trava todas as células dessa palavra para não serem apagadas acidentalmente
+          placement.cells.forEach(cl => {
+            const k = `${cl.r},${cl.c}`;
+            playerState.lockedCells[k] = true;
+            if (playerState.cellStatuses[k] !== 'revealed') {
+              playerState.cellStatuses[k] = 'correct';
+            }
+          });
+
+          // Pontuação + Combo
+          playerState.combo++;
+          if (playerState.combo > playerState.maxCombo) {
+            playerState.maxCombo = playerState.combo;
+          }
+          const wordPoints = placement.word.length * 100 + (playerState.combo > 1 ? (playerState.combo - 1) * 50 : 0);
+          playerState.score += wordPoints;
+
+          triggerCellAnimation(placement.cells, 'anim-celebrate');
+          showToast(
+            `✨ Palavra #${placement.number} (${placement.word}) correta! +${wordPoints} pts${playerState.combo > 1 ? ` (Combo ${playerState.combo}x!)` : ''}`,
+            'success'
+          );
+        } else {
+          // PALAVRA COMPLETA COM LETRA(S) ERRADA(S) -> FEEDBACK IMEDIATO!
+          stats.wrongAttempts++;
+          stats.lastWrongAttemptWord = typedWord;
+          playerState.totalWrongAttempts++;
+          playerState.combo = 0;
+          anyErrorNow = true;
+
+          placement.cells.forEach((cl, idx) => {
+            const k = `${cl.r},${cl.c}`;
+            if (playerState.lockedCells[k]) return;
+            const letterTyped = playerState.inputs[k];
+            if (letterTyped !== placement.word[idx]) {
+              playerState.cellStatuses[k] = 'wrong';
+            } else {
+              delete playerState.cellStatuses[k];
+            }
+          });
+
+          triggerCellAnimation(placement.cells, 'anim-shake');
+          showToast(
+            `❌ Palavra #${placement.number} incorreta! Revise as letras destacadas em vermelho.`,
+            'error'
+          );
+        }
+      }
+
+      if (anySolvedNow) {
+        playSound('correct');
+      } else if (anyErrorNow) {
+        playSound('error');
+      }
+
+      // Verifica se todas as palavras do tabuleiro foram concluídas
+      const totalWords = puzzleData.placements.length;
+      const solvedCount = Object.keys(playerState.solvedPlacements).length;
+
+      if (totalWords > 0 && solvedCount === totalWords && !playerState.isCompleted) {
+        triggerVictory();
+      } else if (anySolvedNow) {
+        // Avança automaticamente para a próxima palavra não resolvida se a palavra atual acabou de ser acertada
+        const active = getActivePlacement();
+        if (active && playerState.solvedPlacements[active.placementId]) {
+          const nextUnsolved = puzzleData.placements.find(p => !playerState.solvedPlacements[p.placementId]);
+          if (nextUnsolved) {
+            setTimeout(() => {
+              if (!playerState.isCompleted) {
+                selectPlacement(nextUnsolved.placementId, true);
+              }
+            }, 420);
+          }
+        }
+      }
+    }
+
+    /**
+     * =========================================================================
+     * RENDERIZAÇÃO DO TABULEIRO, HUD E DICAS NO PAINEL DO JOGADOR
+     * =========================================================================
+     */
+    function getActivePlacement() {
+      const { selectedRow: r, selectedCol: c, direction } = playerState;
+      if (r === null || c === null) return null;
+      const cell = puzzleData.grid[r]?.[c];
+      if (!cell) return null;
+
+      let targetId = direction === 'across' ? cell.acrossId : cell.downId;
+      if (!targetId) targetId = cell.acrossId || cell.downId;
+      return puzzleData.placements.find(p => p.placementId === targetId) || null;
+    }
+
+    function renderGrid() {
+      const wrapper = document.getElementById('grid-wrapper');
+
+      if (!puzzleData.rows || !puzzleData.cols || puzzleData.placements.length === 0) {
+        wrapper.innerHTML = `
+          <div class="text-center py-10 px-4 text-slate-400 text-sm">
+            Nenhuma grade disponível. Volte ao <strong>Administrador</strong> para cadastrar palavras.
+          </div>
+        `;
+        return;
+      }
+
+      const activePlacement = getActivePlacement();
+      const activeSet = new Set(activePlacement ? activePlacement.cells.map(cl => `${cl.r},${cl.c}`) : []);
+
+      const maxCols = puzzleData.cols;
+      const cellSizeCss =
+        maxCols > 14
+          ? 'minmax(26px, 36px)'
+          : maxCols > 10
+          ? 'minmax(30px, 44px)'
+          : 'minmax(36px, 50px)';
+
+      let html = `<div class="crossword-grid" style="grid-template-columns: repeat(${puzzleData.cols}, ${cellSizeCss});">`;
+
+      for (let r = 0; r < puzzleData.rows; r++) {
+        for (let c = 0; c < puzzleData.cols; c++) {
+          const cell = puzzleData.grid[r][c];
+          if (!cell) {
+            html += `<div class="cell-void" style="aspect-ratio: 1 / 1;"></div>`;
+            continue;
+          }
+
+          const coordKey = `${r},${c}`;
+          const isSelected = playerState.selectedRow === r && playerState.selectedCol === c;
+          const isHighlighted = !isSelected && activeSet.has(coordKey);
+          const typedLetter = playerState.inputs[coordKey] || '';
+          const status = playerState.cellStatuses[coordKey];
+          const isLockedCell = !!playerState.lockedCells[coordKey];
+          const animClass = playerState.animatingCells[coordKey] || '';
+
+          let extraClasses = 'cell-active';
+          if (isHighlighted) extraClasses += ' cell-highlighted';
+          if (status === 'revealed') extraClasses += ' cell-revealed';
+          else if (isLockedCell || status === 'correct') extraClasses += ' cell-locked-correct';
+          else if (status === 'wrong') extraClasses += ' cell-wrong';
+          if (isSelected) extraClasses += ' cell-selected';
+          if (animClass) extraClasses += ` ${animClass}`;
+
+          html += `
+            <div
+              class="${extraClasses}"
+              style="aspect-ratio: 1 / 1;"
+              data-row="${r}"
+              data-col="${c}"
+              onclick="handleCellClick(${r}, ${c})"
+            >
+              ${cell.number ? `<span class="cell-number">${cell.number}</span>` : ''}
+              <span class="cell-letter">${escapeHtml(typedLetter)}</span>
+            </div>
+          `;
+        }
+      }
+
+      html += `</div>`;
+      wrapper.innerHTML = html;
+    }
+
+    function renderClues() {
+      const acrossEl = document.getElementById('clues-across');
+      const downEl = document.getElementById('clues-down');
+
+      const acrossList = puzzleData.placements.filter(p => p.dir === 'across');
+      const downList = puzzleData.placements.filter(p => p.dir === 'down');
+      const activePlacement = getActivePlacement();
+
+      const buildListHtml = (items) => {
+        if (items.length === 0) {
+          return `<li class="text-xs text-slate-500 italic py-2">Nenhuma palavra nesta direção.</li>`;
+        }
+        return items
+          .map(item => {
+            const isActive = activePlacement && activePlacement.placementId === item.placementId;
+            const isSolved = !!playerState.solvedPlacements[item.placementId];
+            const stats = playerState.wordStats[item.placementId];
+
+            let btnStyle = 'bg-slate-900/75 hover:bg-slate-800/90 border-slate-800 text-slate-200';
+            if (isSolved && isActive) {
+              btnStyle = 'bg-emerald-950/90 border-emerald-400 text-emerald-100 font-semibold shadow-md';
+            } else if (isSolved) {
+              btnStyle = 'bg-emerald-950/45 border-emerald-500/35 text-emerald-200/90';
+            } else if (isActive) {
+              btnStyle = 'bg-indigo-950/90 border-indigo-400 text-white font-semibold shadow-md';
+            }
+
+            return `
+              <li>
+                <button
+                  type="button"
+                  onclick="selectPlacement('${item.placementId}')"
+                  class="w-full text-left p-2.5 rounded-2xl transition flex items-start gap-2.5 border ${btnStyle}"
+                >
+                  <span class="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center text-xs font-extrabold ${
+                    isSolved
+                      ? 'bg-emerald-500 text-slate-950'
+                      : isActive
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-slate-800 text-slate-300'
+                  }">
+                    ${isSolved ? '✓' : item.number}
+                  </span>
+                  <span class="flex-1 leading-snug text-xs sm:text-sm ${isSolved ? 'line-through decoration-emerald-400/70' : ''}">
+                    ${escapeHtml(item.clue)}
+                    <span class="ml-1.5 text-[11px] font-mono-game text-slate-400">(${item.word.length})</span>
+                  </span>
+                  ${
+                    stats && stats.wrongAttempts > 0 && !isSolved
+                      ? `<span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">${stats.wrongAttempts} erro${stats.wrongAttempts > 1 ? 's' : ''}</span>`
+                      : ''
+                  }
+                </button>
+              </li>
+            `;
+          })
+          .join('');
+      };
+
+      acrossEl.innerHTML = buildListHtml(acrossList);
+      downEl.innerHTML = buildListHtml(downList);
+    }
+
+    function updateActiveClueBanner() {
+      const dirLabel = document.getElementById('active-clue-direction');
+      const numLabel = document.getElementById('active-clue-number');
+      const lenLabel = document.getElementById('active-clue-length');
+      const textLabel = document.getElementById('active-clue-text');
+      const statusBadge = document.getElementById('active-clue-status-badge');
+
+      const active = getActivePlacement();
+      if (!active) {
+        dirLabel.textContent = playerState.direction === 'across' ? 'HORIZONTAIS' : 'VERTICAIS';
+        numLabel.textContent = '#—';
+        lenLabel.textContent = '0 letras';
+        textLabel.textContent = 'Clique em uma célula ou dica para selecionar uma palavra.';
+        statusBadge.classList.add('hidden');
+        return;
+      }
+
+      dirLabel.textContent = active.dir === 'across' ? 'HORIZONTAIS' : 'VERTICAIS';
+      numLabel.textContent = `#${active.number}`;
+      lenLabel.textContent = `${active.word.length} ${active.word.length === 1 ? 'letra' : 'letras'}`;
+      textLabel.textContent = active.clue;
+
+      if (playerState.solvedPlacements[active.placementId]) {
+        statusBadge.classList.remove('hidden');
+      } else {
+        statusBadge.classList.add('hidden');
+      }
+    }
+
+    function updateGameStats() {
+      const totalWords = puzzleData.placements.length;
+      const solvedWords = Object.keys(playerState.solvedPlacements).length;
+      const pct = totalWords > 0 ? Math.round((solvedWords / totalWords) * 100) : 0;
+
+      document.getElementById('game-stats').textContent = `${solvedWords}/${totalWords} palavras (${pct}%)`;
+      document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+      document.getElementById('hud-score').textContent = playerState.score;
+      document.getElementById('hud-combo').textContent = `${playerState.combo}x`;
+    }
+
+    function refreshGameView() {
+      renderGrid();
+      renderClues();
+      updateActiveClueBanner();
+      updateGameStats();
+    }
+
+    /**
+     * =========================================================================
+     * INTERAÇÃO DO JOGADOR (CLIQUES, DIGITAÇÃO, NAVEGAÇÃO)
+     * =========================================================================
+     */
+    function handleCellClick(r, c) {
+      const cell = puzzleData.grid[r]?.[c];
+      if (!cell) return;
+      playSound('click');
+
+      if (playerState.selectedRow === r && playerState.selectedCol === c) {
+        if (cell.acrossId && cell.downId) {
+          playerState.direction = playerState.direction === 'across' ? 'down' : 'across';
+        }
+      } else {
+        playerState.selectedRow = r;
+        playerState.selectedCol = c;
+        if (playerState.direction === 'across' && !cell.acrossId && cell.downId) {
+          playerState.direction = 'down';
+        } else if (playerState.direction === 'down' && !cell.downId && cell.acrossId) {
+          playerState.direction = 'across';
+        }
+      }
+
+      focusMobileProxy();
+      refreshGameView();
+    }
+
+    function selectPlacement(placementId, silent = false) {
+      const placement = puzzleData.placements.find(p => p.placementId === placementId);
+      if (!placement) return;
+      if (!silent) playSound('click');
+
+      playerState.direction = placement.dir;
+      const firstEmpty = placement.cells.find(cl => !playerState.inputs[`${cl.r},${cl.c}`]);
+      const targetCell = firstEmpty || placement.cells[0];
+
+      playerState.selectedRow = targetCell.r;
+      playerState.selectedCol = targetCell.c;
+
+      focusMobileProxy();
+      refreshGameView();
+    }
+
+    function toggleDirection() {
+      const { selectedRow: r, selectedCol: c } = playerState;
+      const cell = r !== null && c !== null ? puzzleData.grid[r]?.[c] : null;
+      playSound('click');
+
+      playerState.direction = playerState.direction === 'across' ? 'down' : 'across';
+
+      if (cell) {
+        if (playerState.direction === 'across' && !cell.acrossId && cell.downId) {
+          playerState.direction = 'down';
+        } else if (playerState.direction === 'down' && !cell.downId && cell.acrossId) {
+          playerState.direction = 'across';
+        }
+      }
+      refreshGameView();
+    }
+
+    function focusMobileProxy() {
+      const proxy = document.getElementById('mobile-keyboard-proxy');
+      if (proxy && window.innerWidth < 768) {
+        proxy.value = '';
+        proxy.focus({ preventScroll: true });
+      }
+    }
+
+    function moveWithinActiveWord(step) {
+      const active = getActivePlacement();
+      const { selectedRow: r, selectedCol: c } = playerState;
+      if (!active || r === null || c === null) return;
+
+      const idx = active.cells.findIndex(cl => cl.r === r && cl.c === c);
+      if (idx === -1) return;
+
+      let nextIdx = idx + step;
+      // Ao avançar, pula células já travadas (de palavras cruzadas já acertadas) se houver próximas livres
+      if (step > 0) {
+        while (
+          nextIdx < active.cells.length &&
+          playerState.lockedCells[`${active.cells[nextIdx].r},${active.cells[nextIdx].c}`]
+        ) {
+          nextIdx++;
+        }
+      }
+
+      if (nextIdx >= 0 && nextIdx < active.cells.length) {
+        playerState.selectedRow = active.cells[nextIdx].r;
+        playerState.selectedCol = active.cells[nextIdx].c;
+      }
+    }
+
+    function moveCursorByArrow(dr, dc) {
+      let r = playerState.selectedRow;
+      let c = playerState.selectedCol;
+      if (r === null || c === null) return;
+
+      if (dc !== 0) playerState.direction = 'across';
+      if (dr !== 0) playerState.direction = 'down';
+
+      let nr = r + dr;
+      let nc = c + dc;
+      while (nr >= 0 && nr < puzzleData.rows && nc >= 0 && nc < puzzleData.cols) {
+        if (puzzleData.grid[nr][nc]) {
+          playerState.selectedRow = nr;
+          playerState.selectedCol = nc;
+          refreshGameView();
+          return;
+        }
+        nr += dr;
+        nc += dc;
+      }
+    }
+
+    function enterLetterAtSelected(letter) {
+      if (activeRole !== 'player') return;
+      if (playerState.isLocked) {
+        showToast('A partida foi encerrada. Clique em "Reiniciar" para jogar novamente.', 'warning');
+        return;
+      }
+
+      const { selectedRow: r, selectedCol: c } = playerState;
+      if (r === null || c === null) return;
+      const cell = puzzleData.grid[r]?.[c];
+      if (!cell) return;
+
+      const normLetter = normalizeWord(letter).slice(0, 1);
+      if (!normLetter) return;
+
+      const key = `${r},${c}`;
+
+      // Se a célula já pertence a uma palavra acertada/travada, não sobrescreve e apenas avança
+      if (playerState.lockedCells[key]) {
+        moveWithinActiveWord(1);
+        refreshGameView();
+        return;
+      }
+
+      playSound('type');
+      playerState.inputs[key] = normLetter;
+      delete playerState.cellStatuses[key];
+      playerState.animatingCells[key] = 'anim-pop';
+      setTimeout(() => {
+        delete playerState.animatingCells[key];
+      }, 220);
+
+      // Avalia imediatamente se alguma palavra que passa por (r, c) foi completada!
+      evaluateWordsAffectedByCell(r, c);
+
+      // Avança o cursor dentro da palavra ativa (se o jogo ainda não acabou)
+      if (!playerState.isCompleted) {
+        moveWithinActiveWord(1);
+      }
+
+      refreshGameView();
+    }
+
+    function handleBackspace() {
+      if (activeRole !== 'player' || playerState.isLocked) return;
+
+      const { selectedRow: r, selectedCol: c } = playerState;
+      if (r === null || c === null) return;
+      const key = `${r},${c}`;
+
+      if (!playerState.lockedCells[key] && playerState.inputs[key]) {
+        playSound('click');
+        delete playerState.inputs[key];
+        delete playerState.cellStatuses[key];
+        refreshGameView();
+      } else {
+        // Volta para a célula anterior não travada
+        const active = getActivePlacement();
+        if (!active) return;
+        const idx = active.cells.findIndex(cl => cl.r === r && cl.c === c);
+        for (let i = idx - 1; i >= 0; i--) {
+          const prevCell = active.cells[i];
+          const prevKey = `${prevCell.r},${prevCell.c}`;
+          playerState.selectedRow = prevCell.r;
+          playerState.selectedCol = prevCell.c;
+          if (!playerState.lockedCells[prevKey]) {
+            playSound('click');
+            delete playerState.inputs[prevKey];
+            delete playerState.cellStatuses[prevKey];
+            break;
+          }
+        }
+        refreshGameView();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (activeRole !== 'player') return;
+      if (!document.getElementById('pin-modal').classList.contains('hidden')) return;
+
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' && document.activeElement?.id !== 'mobile-keyboard-proxy') {
+        return;
+      }
+
+      if (!puzzleData.rows || playerState.selectedRow === null) return;
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        moveCursorByArrow(0, 1);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        moveCursorByArrow(0, -1);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveCursorByArrow(1, 0);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveCursorByArrow(-1, 0);
+      } else if (e.key === 'Backspace' || e.key === 'Delete') {
+        e.preventDefault();
+        handleBackspace();
+      } else if (e.key === 'Tab') {
+        e.preventDefault();
+        const active = getActivePlacement();
+        const list = puzzleData.placements;
+        if (list.length > 0) {
+          const curIdx = active ? list.findIndex(p => p.placementId === active.placementId) : -1;
+          const nextIdx = e.shiftKey
+            ? (curIdx - 1 + list.length) % list.length
+            : (curIdx + 1) % list.length;
+          selectPlacement(list[nextIdx].placementId);
+        }
+      } else if (/^[a-zA-ZÀ-ÿ]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        enterLetterAtSelected(e.key);
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const proxy = document.getElementById('mobile-keyboard-proxy');
+      if (proxy) {
+        proxy.addEventListener('input', () => {
+          const val = proxy.value;
+          if (val) {
+            const lastChar = val[val.length - 1];
+            if (/^[a-zA-ZÀ-ÿ]$/.test(lastChar)) {
+              enterLetterAtSelected(lastChar);
+            }
+            proxy.value = '';
+          }
+        });
+      }
+    });
+
+    /**
+     * =========================================================================
+     * DICAS, VITÓRIA E MODAL FINAL
+     * =========================================================================
+     */
+    function revealCurrentLetter() {
+      if (!gameConfig.allowHints || playerState.isLocked) return;
+
+      const { selectedRow: r, selectedCol: c } = playerState;
+      if (r === null || c === null) {
+        showToast('Selecione uma célula do tabuleiro primeiro.', 'warning');
+        return;
+      }
+
+      const cell = puzzleData.grid[r]?.[c];
+      if (!cell) return;
+      const key = `${r},${c}`;
+
+      if (playerState.lockedCells[key]) {
+        showToast('Esta letra já está correta e travada!', 'info');
+        return;
+      }
+
+      playerState.inputs[key] = cell.letter;
+      playerState.cellStatuses[key] = 'revealed';
+      playerState.totalHintsUsed++;
+      playerState.score = Math.max(0, playerState.score - 25);
+
+      const active = getActivePlacement();
+      if (active && playerState.wordStats[active.placementId]) {
+        playerState.wordStats[active.placementId].hintsUsed++;
+      }
+
+      playSound('type');
+      evaluateWordsAffectedByCell(r, c);
+      if (!playerState.isCompleted) moveWithinActiveWord(1);
+      refreshGameView();
+    }
+
+    function revealCurrentWord() {
+      if (!gameConfig.allowHints || playerState.isLocked) return;
+
+      const active = getActivePlacement();
+      if (!active) {
+        showToast('Selecione uma palavra para revelar.', 'warning');
+        return;
+      }
+
+      if (playerState.solvedPlacements[active.placementId]) {
+        showToast('Esta palavra já foi concluída!', 'info');
+        return;
+      }
+
+      const stats = playerState.wordStats[active.placementId];
+      if (stats) {
+        stats.hintsUsed += active.word.length;
+        stats.revealedByHint = true;
+      }
+      playerState.totalHintsUsed++;
+      playerState.combo = 0;
+      playerState.score = Math.max(0, playerState.score - 50);
+
+      for (let i = 0; i < active.word.length; i++) {
+        const { r, c } = active.cells[i];
+        const key = `${r},${c}`;
+        playerState.inputs[key] = active.word[i];
+        playerState.cellStatuses[key] = 'revealed';
+        playerState.lockedCells[key] = true;
+      }
+
+      playerState.solvedPlacements[active.placementId] = true;
+      if (stats) stats.solved = true;
+
+      // Também verifica se alguma palavra cruzada foi completada por tabela
+      active.cells.forEach(({ r, c }) => evaluateWordsAffectedByCell(r, c));
+
+      playSound('correct');
+      triggerCellAnimation(active.cells, 'anim-celebrate');
+      refreshGameView();
+
+      const totalWords = puzzleData.placements.length;
+      const solvedCount = Object.keys(playerState.solvedPlacements).length;
+      if (totalWords > 0 && solvedCount === totalWords && !playerState.isCompleted) {
+        triggerVictory();
+      }
+    }
+
+    function triggerVictory() {
+      playerState.isCompleted = true;
+      playerState.isLocked = true;
+      playerState.endReason = 'completed';
+      stopTimer();
+
+      playSound('victory');
+      launchConfetti();
+      refreshGameView();
+
+      setTimeout(() => {
+        openEndgameModal(true);
+      }, 500);
+    }
+
+    function openEndgameModal(isVictory) {
+      const modal = document.getElementById('endgame-modal');
+      const icon = document.getElementById('endgame-icon');
+      const title = document.getElementById('endgame-title');
+      const subtitle = document.getElementById('endgame-subtitle');
+      const timeCard = document.getElementById('endgame-time-card');
+      const timeValue = document.getElementById('endgame-time-value');
+
+      const totalWords = puzzleData.placements.length;
+      const solvedWords = Object.keys(playerState.solvedPlacements).length;
+
+      document.getElementById('endgame-score-value').textContent = playerState.score;
+      document.getElementById('endgame-accuracy-value').textContent = `${solvedWords}/${totalWords}`;
+      document.getElementById('endgame-errors-value').textContent = playerState.totalWrongAttempts;
+
+      if (isVictory) {
+        icon.className = 'w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 flex items-center justify-center text-4xl shadow-lg shadow-emerald-500/30';
+        icon.textContent = '🏆';
+        title.textContent = 'Vitória! Fase Concluída!';
+        subtitle.textContent = `Excelente desempenho em "${gameConfig.title}"!`;
+      } else {
+        icon.className = 'w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-rose-500 to-red-700 text-white flex items-center justify-center text-4xl shadow-lg shadow-rose-500/30';
+        icon.textContent = '⏰';
+        title.textContent = 'Tempo Esgotado!';
+        subtitle.textContent = 'O cronômetro chegou a zero. Salve seu relatório em PDF abaixo!';
+      }
+
+      if (gameConfig.timerEnabled) {
+        timeCard.classList.remove('hidden');
+        timeValue.textContent = getElapsedTimeFormatted();
+      } else {
+        timeCard.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeEndgameModal() {
+      document.getElementById('endgame-modal').classList.add('hidden');
+    }
+
+    function restartPlayerSession() {
+      resetPlayerSessionData();
+      if (puzzleData.placements.length > 0) {
+        const first = puzzleData.placements[0];
+        playerState.selectedRow = first.row;
+        playerState.selectedCol = first.col;
+        playerState.direction = first.dir;
+      }
+      playSound('click');
+      setupPlayerTimer();
+      refreshGameView();
+      showToast('Nova partida iniciada! Boa sorte!', 'info');
+    }
+
+    /**
+     * =========================================================================
+     * GERAÇÃO DE RELATÓRIO DE DESEMPENHO EM PDF (JSPDF + FALLBACK IMPRESSÃO)
+     * =========================================================================
+     */
+    function buildPerformanceSummaryData() {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR');
+      const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      const playerName = (playerState.playerName || document.getElementById('player-name-input')?.value || '').trim() || 'Jogador(a)';
+
+      const totalWords = puzzleData.placements.length;
+      const solvedWords = Object.keys(playerState.solvedPlacements).length;
+      const accuracyPct = totalWords > 0 ? Math.round((solvedWords / totalWords) * 100) : 0;
+
+      let statusLabel = 'Em Andamento';
+      if (playerState.endReason === 'completed' || (totalWords > 0 && solvedWords === totalWords)) {
+        statusLabel = 'Concluído (Vitória)';
+      } else if (playerState.endReason === 'timeout') {
+        statusLabel = 'Tempo Esgotado';
+      }
+
+      const rows = puzzleData.placements.map(p => {
+        const stats = playerState.wordStats[p.placementId] || {
+          attempts: 0,
+          wrongAttempts: 0,
+          lastWrongAttemptWord: '',
+          hintsUsed: 0,
+          solved: false,
+          revealedByHint: false
+        };
+
+        // Monta o que está atualmente escrito nas células dessa palavra
+        const currentTyped = p.cells
+          .map(cl => playerState.inputs[`${cl.r},${cl.c}`] || '_')
+          .join('');
+
+        let wordStatus = 'Não concluída';
+        if (stats.revealedByHint) {
+          wordStatus = 'Revelada (Dica)';
+        } else if (stats.solved) {
+          wordStatus = stats.wrongAttempts === 0 ? 'Acertou de 1ª' : `Acertou (${stats.wrongAttempts} erro${stats.wrongAttempts > 1 ? 's' : ''})`;
+        } else if (stats.wrongAttempts > 0) {
+          wordStatus = `Errou (${stats.wrongAttempts}x)`;
+        }
+
+        const playerDisplay = stats.solved
+          ? p.word
+          : (currentTyped.replace(/_/g, '') ? currentTyped : (stats.lastWrongAttemptWord || '(Em branco)'));
+
+        return {
+          number: p.number,
+          direction: p.dir === 'across' ? 'Horizontal' : 'Vertical',
+          clue: p.clue,
+          expected: p.word,
+          typed: playerDisplay,
+          wrongAttempts: stats.wrongAttempts,
+          hintsUsed: stats.hintsUsed,
+          status: wordStatus,
+          isSolved: stats.solved
+        };
+      });
+
+      return {
+        gameTitle: gameConfig.title || 'Palavras Cruzadas',
+        playerName,
+        dateTime: `${dateStr} às ${timeStr}`,
+        statusLabel,
+        elapsedFormatted: getElapsedTimeFormatted(),
+        score: playerState.score,
+        maxCombo: playerState.maxCombo,
+        totalWords,
+        solvedWords,
+        accuracyPct,
+        totalWrongAttempts: playerState.totalWrongAttempts,
+        totalHintsUsed: playerState.totalHintsUsed,
+        rows
+      };
+    }
+
+    function generatePerformancePdf() {
+      const data = buildPerformanceSummaryData();
+
+      if (!window.jspdf || !window.jspdf.jsPDF) {
+        fallbackPrintReport(data);
+        return;
+      }
+
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        const contentWidth = pageWidth - margin * 2;
+        let y = 16;
+
+        // Cabeçalho colorido estilo banner
+        doc.setFillColor(30, 27, 75);
+        doc.roundedRect(margin, y, contentWidth, 26, 3, 3, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.text('RELATÓRIO DE DESEMPENHO — PALAVRAS CRUZADAS', margin + 5, y + 9);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(199, 210, 254);
+        doc.text(`Fase: ${data.gameTitle}`, margin + 5, y + 16);
+        doc.text(`Jogador(a): ${data.playerName}   |   Data: ${data.dateTime}`, margin + 5, y + 22);
+
+        y += 32;
+
+        // Cards de Resumo (2 linhas x 3 colunas)
+        const boxW = (contentWidth - 8) / 3;
+        const boxH = 16;
+        const metrics = [
+          { label: 'STATUS DA PARTIDA', value: data.statusLabel, color: [79, 70, 229] },
+          { label: 'APROVEITAMENTO', value: `${data.solvedWords}/${data.totalWords} (${data.accuracyPct}%)`, color: [5, 150, 105] },
+          { label: 'PONTUAÇÃO TOTAL', value: `${data.score} pts`, color: [217, 119, 6] },
+          { label: 'ERROS COMETIDOS', value: `${data.totalWrongAttempts} tentativa(s)`, color: [225, 29, 72] },
+          { label: 'TEMPO DE JOGO', value: data.elapsedFormatted, color: [2, 132, 199] },
+          { label: 'DICAS UTILIZADAS', value: `${data.totalHintsUsed} dica(s)`, color: [100, 116, 139] }
+        ];
+
+        metrics.forEach((m, idx) => {
+          const col = idx % 3;
+          const row = Math.floor(idx / 3);
+          const bx = margin + col * (boxW + 4);
+          const by = y + row * (boxH + 4);
+
+          doc.setFillColor(248, 250, 252);
+          doc.setDrawColor(203, 213, 225);
+          doc.roundedRect(bx, by, boxW, boxH, 2, 2, 'FD');
+
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(7.5);
+          doc.setTextColor(100, 116, 139);
+          doc.text(m.label, bx + 3.5, by + 5.5);
+
+          doc.setFontSize(10.5);
+          doc.setTextColor(m.color[0], m.color[1], m.color[2]);
+          doc.text(String(m.value), bx + 3.5, by + 12.5);
+        });
+
+        y += (boxH + 4) * 2 + 5;
+
+        // Título da Tabela Detalhada
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Detalhamento por Palavra (Acertos e Erros)', margin, y);
+        y += 4;
+
+        // Cabeçalho da Tabela
+        const cols = [
+          { label: '#', w: 10 },
+          { label: 'Dir.', w: 18 },
+          { label: 'Pergunta / Dica', w: 66 },
+          { label: 'Gabarito', w: 28 },
+          { label: 'Sua Resposta', w: 28 },
+          { label: 'Resultado', w: 32 }
+        ];
+
+        function drawTableHeader(posY) {
+          doc.setFillColor(15, 23, 42);
+          doc.rect(margin, posY, contentWidth, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+
+          let cx = margin + 2;
+          cols.forEach(col => {
+            doc.text(col.label, cx, posY + 5.3);
+            cx += col.w;
+          });
+          return posY + 8;
+        }
+
+        y = drawTableHeader(y);
+
+        // Linhas da Tabela
+        data.rows.forEach((item, index) => {
+          const clueLines = doc.splitTextToSize(item.clue, cols[2].w - 3);
+          const rowHeight = Math.max(8, clueLines.length * 4.2 + 3.5);
+
+          if (y + rowHeight > pageHeight - 16) {
+            doc.addPage();
+            y = 16;
+            y = drawTableHeader(y);
+          }
+
+          if (index % 2 === 1) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(margin, y, contentWidth, rowHeight, 'F');
+          }
+
+          doc.setDrawColor(226, 232, 240);
+          doc.line(margin, y + rowHeight, margin + contentWidth, y + rowHeight);
+
+          let cx = margin + 2;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(30, 41, 59);
+          doc.text(String(item.number), cx, y + 5);
+          cx += cols[0].w;
+
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(71, 85, 105);
+          doc.text(item.direction === 'Horizontal' ? 'Horiz.' : 'Vert.', cx, y + 5);
+          cx += cols[1].w;
+
+          doc.setTextColor(15, 23, 42);
+          doc.text(clueLines, cx, y + 5);
+          cx += cols[2].w;
+
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(5, 150, 105);
+          doc.text(item.expected, cx, y + 5);
+          cx += cols[3].w;
+
+          doc.setTextColor(item.isSolved ? 5 : 225, item.isSolved ? 150 : 29, item.isSolved ? 105 : 72);
+          doc.text(item.typed, cx, y + 5);
+          cx += cols[4].w;
+
+          if (item.isSolved && item.wrongAttempts === 0) {
+            doc.setTextColor(5, 150, 105);
+          } else if (item.isSolved) {
+            doc.setTextColor(217, 119, 6);
+          } else {
+            doc.setTextColor(225, 29, 72);
+          }
+          doc.text(item.status, cx, y + 5);
+
+          y += rowHeight;
+        });
+
+        // Rodapé do PDF
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(7.5);
+        doc.setTextColor(148, 163, 184);
+        doc.text(
+          'Gerado automaticamente pelo Jogo de Palavras Cruzadas Interativo.',
+          margin,
+          pageHeight - 8
+        );
+
+        const slugName = normalizeWord(data.playerName).toLowerCase() || 'jogador';
+        doc.save(`relatorio_palavras_cruzadas_${slugName}.pdf`);
+        playSound('correct');
+        showToast('Relatório PDF baixado com sucesso!', 'success');
+      } catch (err) {
+        fallbackPrintReport(data);
+      }
+    }
+
+    function fallbackPrintReport(data) {
+      const container = document.getElementById('print-report-container');
+      container.innerHTML = `
+        <h1 style="font-size:20px;font-weight:bold;margin-bottom:4px;">Relatório de Desempenho — ${escapeHtml(data.gameTitle)}</h1>
+        <p style="font-size:12px;color:#475569;margin-bottom:14px;">
+          Jogador(a): <strong>${escapeHtml(data.playerName)}</strong> | Data: ${escapeHtml(data.dateTime)} | Status: <strong>${escapeHtml(data.statusLabel)}</strong>
+        </p>
+        <p style="font-size:13px;margin-bottom:14px;">
+          Acertos: <strong>${data.solvedWords}/${data.totalWords} (${data.accuracyPct}%)</strong> |
+          Erros: <strong>${data.totalWrongAttempts}</strong> |
+          Pontos: <strong>${data.score}</strong> |
+          Tempo: <strong>${escapeHtml(data.elapsedFormatted)}</strong>
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead>
+            <tr style="background:#0f172a;color:#fff;text-align:left;">
+              <th style="padding:6px;">#</th>
+              <th style="padding:6px;">Direção</th>
+              <th style="padding:6px;">Pergunta</th>
+              <th style="padding:6px;">Gabarito</th>
+              <th style="padding:6px;">Sua Resposta</th>
+              <th style="padding:6px;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.rows
+              .map(
+                r => `
+              <tr style="border-bottom:1px solid #cbd5e1;">
+                <td style="padding:6px;">${r.number}</td>
+                <td style="padding:6px;">${r.direction}</td>
+                <td style="padding:6px;">${escapeHtml(r.clue)}</td>
+                <td style="padding:6px;font-weight:bold;">${escapeHtml(r.expected)}</td>
+                <td style="padding:6px;">${escapeHtml(r.typed)}</td>
+                <td style="padding:6px;">${escapeHtml(r.status)}</td>
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
+      `;
+      window.print();
+    }
+
+    /**
+     * =========================================================================
+     * INICIALIZAÇÃO
+     * =========================================================================
+     */
+    loadStateFromStorage();
+    syncAdminFormFromConfig();
+    renderPairsList();
+    generateCrossword();
+  </script>
+</body>
+</html>
