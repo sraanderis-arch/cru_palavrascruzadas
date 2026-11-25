@@ -159,33 +159,33 @@
       gap: 4px;
       padding: 10px;
       border-radius: 20px;
+    /* Grade e células coloridas do tabuleiro (ajustáveis dinamicamente) */
+    .cw-grid {
+      display: grid;
+      gap: var(--cw-gap, 4px);
+      padding: var(--cw-pad, 10px);
+      border-radius: 20px;
       background: linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(30, 27, 75, 0.92));
       border: 2px solid rgba(56, 189, 248, 0.45);
       box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.65);
+      max-width: 100%;
+      width: fit-content;
+      margin: 0 auto;
     }
 
     .cw-cell {
       position: relative;
-      width: 38px;
-      height: 38px;
-      border-radius: 9px;
+      width: var(--cw-cell-size, 42px);
+      height: var(--cw-cell-size, 42px);
+      border-radius: var(--cw-radius, 9px);
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: 'JetBrains Mono', monospace;
       font-weight: 800;
-      font-size: 1.05rem;
+      font-size: var(--cw-font-size, 1.15rem);
       user-select: none;
       transition: transform 0.14s ease, background-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
-    }
-
-    @media (min-width: 640px) {
-      .cw-cell {
-        width: 44px;
-        height: 44px;
-        font-size: 1.2rem;
-        border-radius: 10px;
-      }
     }
 
     .cw-cell-empty {
@@ -240,9 +240,9 @@
     .cw-cell-num {
       position: absolute;
       top: 2px;
-      left: 4px;
+      left: 3px;
       font-family: 'Inter', sans-serif;
-      font-size: 0.62rem;
+      font-size: var(--cw-num-size, 0.62rem);
       font-weight: 800;
       line-height: 1;
       color: #4338ca;
@@ -679,20 +679,24 @@
 
       <!-- Pré-visualização Rápida do Gabarito -->
       <div class="arcade-panel rounded-3xl p-5 space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="font-game text-base font-bold text-white flex items-center gap-2">
-            <span>🗺️</span>
-            <span>Prévia da Grade</span>
-          </h3>
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h3 class="font-game text-base font-bold text-white flex items-center gap-2">
+              <span>🗺️</span>
+              <span>Prévia da Grade</span>
+            </h3>
+            <p id="admin-grid-meta" class="text-[11px] text-cyan-200/75"></p>
+          </div>
           <button
             type="button"
             onclick="regenerateGridWithFeedback()"
-            class="btn-3d btn-3d-violet px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1"
+            class="btn-3d btn-3d-violet px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0"
           >
             <span>🔀</span>
             <span>Reorganizar</span>
           </button>
         </div>
+        <div id="admin-grid-status" class="hidden text-xs font-bold p-2.5 rounded-xl bg-amber-950/70 border border-amber-400/40 text-amber-200"></div>
         <div id="admin-grid-preview" class="w-full flex items-center justify-center overflow-x-auto py-3 px-2 rounded-2xl bg-slate-950/70 border border-slate-800 min-h-[160px]"></div>
       </div>
     </section>
@@ -1226,8 +1230,9 @@
     let puzzleData = {
       rows: 0,
       cols: 0,
-      grid: [],       // Matriz [r][c] com letra ou null
-      placements: []  // Array de palavras posicionadas
+      grid: [],         // Matriz [r][c] com letra ou null
+      placements: [],   // Array de palavras posicionadas
+      unplaced: []      // Palavras que não encaixaram na tentativa atual
     };
 
     let playerState = {
@@ -1955,8 +1960,54 @@
     }
 
     /* =====================================================================
-       GERADOR AUTOMÁTICO DE GRADE DE PALAVRAS CRUZADAS
+       GERADOR DINÂMICO E AJUSTÁVEL AO TAMANHO DAS PALAVRAS
        ===================================================================== */
+    function computeDynamicGridDimensions(preparedWords) {
+      const maxWordLen = preparedWords.reduce((max, item) => Math.max(max, item.word.length), 0);
+      const totalLetters = preparedWords.reduce((sum, item) => sum + item.word.length, 0);
+      const count = preparedWords.length;
+
+      // Calcula área de trabalho proporcional ao tamanho da maior palavra e ao total de letras
+      const estimatedSpan = Math.max(
+        maxWordLen * 2 + 8,
+        Math.ceil(Math.sqrt(Math.max(16, totalLetters * 2.4))) + maxWordLen,
+        count * 3 + 6
+      );
+
+      // Limite superior generoso para palavras longas sem desperdício quando há poucas palavras curtas
+      const size = Math.max(12, Math.min(64, estimatedSpan));
+      return size;
+    }
+
+    function computeResponsiveGridCssVars(rows, cols, containerEl) {
+      const maxDim = Math.max(rows || 1, cols || 1);
+      const availWidth = containerEl && containerEl.clientWidth > 40
+        ? containerEl.clientWidth - 36
+        : Math.min(window.innerWidth - 64, 720);
+
+      // Ajusta o tamanho da célula conforme quantidade de colunas e largura disponível
+      const fitByWidth = Math.floor((availWidth - (cols + 1) * 4) / Math.max(1, cols));
+      let cellSize = Math.min(46, Math.max(22, fitByWidth));
+
+      if (maxDim >= 18) cellSize = Math.min(cellSize, 32);
+      if (maxDim >= 24) cellSize = Math.min(cellSize, 26);
+
+      const gap = cellSize <= 26 ? 2 : cellSize <= 34 ? 3 : 4;
+      const pad = cellSize <= 26 ? 6 : 10;
+      const radius = cellSize <= 26 ? 6 : 9;
+      const fontSizeRem = Math.max(0.72, Math.min(1.2, (cellSize * 0.46) / 16));
+      const numSizeRem = Math.max(0.52, Math.min(0.68, (cellSize * 0.26) / 16));
+
+      return [
+        `--cw-cell-size:${cellSize}px`,
+        `--cw-gap:${gap}px`,
+        `--cw-pad:${pad}px`,
+        `--cw-radius:${radius}px`,
+        `--cw-font-size:${fontSizeRem.toFixed(2)}rem`,
+        `--cw-num-size:${numSizeRem.toFixed(2)}rem`
+      ].join(';');
+    }
+
     function generateCrosswordLayout() {
       const prepared = wordPairs
         .map(p => ({
@@ -1969,12 +2020,12 @@
         .sort((a, b) => b.word.length - a.word.length);
 
       if (prepared.length === 0) {
-        puzzleData = { rows: 0, cols: 0, grid: [], placements: [] };
+        puzzleData = { rows: 0, cols: 0, grid: [], placements: [], unplaced: [] };
         resetPlayerState();
         return;
       }
 
-      const SIZE = 34;
+      const SIZE = computeDynamicGridDimensions(prepared);
       const board = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
       const placed = [];
 
@@ -2033,14 +2084,14 @@
         });
       }
 
-      // Coloca primeira palavra no centro
+      // Coloca a maior palavra no centro da grade dinâmica
       const first = prepared[0];
       const startRow = Math.floor(SIZE / 2);
       const startCol = Math.max(1, Math.floor((SIZE - first.word.length) / 2));
       putWord(first, startRow, startCol, 'across');
 
       const remaining = prepared.slice(1);
-      for (let pass = 0; pass < 3; pass++) {
+      for (let pass = 0; pass < 4; pass++) {
         for (let idx = remaining.length - 1; idx >= 0; idx--) {
           const item = remaining[idx];
           let bestMove = null;
@@ -2061,7 +2112,8 @@
                 const candC = targetDir === 'across' ? pc - j : pc;
                 const check = canPlaceWord(item.word, candR, candC, targetDir);
                 if (check.ok) {
-                  const score = check.intersections * 10 - Math.abs(candR - SIZE / 2) - Math.abs(candC - SIZE / 2);
+                  const distCenter = Math.abs(candR - SIZE / 2) + Math.abs(candC - SIZE / 2);
+                  const score = check.intersections * 15 - distCenter * 0.6;
                   if (!bestMove || score > bestMove.score) {
                     bestMove = { r: candR, c: candC, dir: targetDir, score };
                   }
@@ -2077,21 +2129,28 @@
         }
       }
 
-      // Se alguma palavra não encontrou cruzamento, posiciona em linha livre abaixo
+      // Se alguma palavra não encontrou cruzamento, tenta alocar em linha livre mantendo a grade compacta
+      const unplaced = [];
       let fallbackRow = 1;
       for (const item of remaining) {
+        let placedFallback = false;
         while (fallbackRow < SIZE - 1) {
-          const check = canPlaceWord(item.word, fallbackRow, 2, 'across');
+          const startC = Math.max(1, Math.floor((SIZE - item.word.length) / 2));
+          const check = canPlaceWord(item.word, fallbackRow, startC, 'across');
           if (check.ok) {
-            putWord(item, fallbackRow, 2, 'across');
+            putWord(item, fallbackRow, startC, 'across');
             fallbackRow += 2;
+            placedFallback = true;
             break;
           }
           fallbackRow++;
         }
+        if (!placedFallback) {
+          unplaced.push(item);
+        }
       }
 
-      // Recorta limites ocupados
+      // Recorta exatamente para os limites ocupados (sem espaços vazios sobrando)
       let minR = SIZE, maxR = -1, minC = SIZE, maxC = -1;
       placed.forEach(p => {
         const dr = p.dir === 'down' ? 1 : 0;
@@ -2141,7 +2200,8 @@
         rows,
         cols,
         grid: croppedGrid,
-        placements: normalizedPlacements
+        placements: normalizedPlacements,
+        unplaced
       };
 
       resetPlayerState();
@@ -2149,9 +2209,24 @@
 
     function renderAdminGridPreview() {
       const container = document.getElementById('admin-grid-preview');
+      const metaEl = document.getElementById('admin-grid-meta');
+      const statusEl = document.getElementById('admin-grid-status');
+
       if (!puzzleData.rows || !puzzleData.cols) {
+        metaEl.textContent = '0 × 0';
+        statusEl.classList.add('hidden');
         container.innerHTML = '<span class="text-xs text-slate-400">Adicione palavras para visualizar a grade.</span>';
         return;
+      }
+
+      metaEl.textContent = `Grade ajustada: ${puzzleData.rows} linhas × ${puzzleData.cols} colunas (${puzzleData.placements.length} palavras)`;
+
+      if (puzzleData.unplaced && puzzleData.unplaced.length > 0) {
+        const names = puzzleData.unplaced.map(u => u.word).join(', ');
+        statusEl.innerHTML = `⚠️ Não couberam automaticamente na disposição atual: <strong>${escapeHtml(names)}</strong>. Clique em <strong>Reorganizar</strong> ou revise o tamanho/cruzamento.`;
+        statusEl.classList.remove('hidden');
+      } else {
+        statusEl.classList.add('hidden');
       }
 
       const numMap = {};
@@ -2159,7 +2234,8 @@
         numMap[`${p.row},${p.col}`] = p.number;
       });
 
-      let html = `<div class="cw-grid" style="grid-template-columns: repeat(${puzzleData.cols}, minmax(0, 1fr));">`;
+      const cssVars = computeResponsiveGridCssVars(puzzleData.rows, puzzleData.cols, container);
+      let html = `<div class="cw-grid" style="${cssVars}; grid-template-columns: repeat(${puzzleData.cols}, var(--cw-cell-size));">`;
       for (let r = 0; r < puzzleData.rows; r++) {
         for (let c = 0; c < puzzleData.cols; c++) {
           const letter = puzzleData.grid[r][c];
@@ -2701,7 +2777,10 @@
         if (!numMap[key]) numMap[key] = p.number;
       });
 
-      let gridHtml = `<div class="cw-grid" style="grid-template-columns: repeat(${puzzleData.cols}, minmax(0, 1fr));">`;
+      const boardContainer = document.getElementById('player-board-container');
+      const cssVars = computeResponsiveGridCssVars(puzzleData.rows, puzzleData.cols, boardContainer);
+
+      let gridHtml = `<div class="cw-grid" style="${cssVars}; grid-template-columns: repeat(${puzzleData.cols}, var(--cw-cell-size));">`;
       for (let r = 0; r < puzzleData.rows; r++) {
         for (let c = 0; c < puzzleData.cols; c++) {
           const expected = puzzleData.grid[r][c];
@@ -2744,7 +2823,7 @@
         }
       }
       gridHtml += '</div>';
-      document.getElementById('player-board-container').innerHTML = gridHtml;
+      boardContainer.innerHTML = gridHtml;
 
       renderCluesColumn('clues-across-list', puzzleData.placements.filter(p => p.dir === 'across'), activePlacement);
       renderCluesColumn('clues-down-list', puzzleData.placements.filter(p => p.dir === 'down'), activePlacement);
@@ -2948,6 +3027,14 @@
       } else if (e.key.length === 1 && /[a-zA-ZÀ-ÿ]/.test(e.key)) {
         e.preventDefault();
         handleLetterInput(e.key);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      if (!document.getElementById('view-player').classList.contains('hidden')) {
+        renderPlayerScreen();
+      } else if (!document.getElementById('view-admin').classList.contains('hidden')) {
+        renderAdminGridPreview();
       }
     });
 
