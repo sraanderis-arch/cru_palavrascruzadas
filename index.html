@@ -905,34 +905,45 @@
         <div class="px-3.5 py-2 rounded-2xl bg-emerald-500/15 border border-emerald-400/40 text-center">
           <div class="text-[10px] font-extrabold uppercase text-emerald-300">Acertos</div>
           <div id="hud-progress-text" class="font-mono-game text-lg font-extrabold text-emerald-200">0/0</div>
+          <div class="mt-1 flex items-center gap-1.5">
+            <div class="w-16 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div id="hud-progress-bar" class="h-full w-0 bg-gradient-to-r from-cyan-400 via-emerald-400 to-amber-300 transition-all duration-300"></div>
+            </div>
+            <span id="hud-percent-text" class="font-mono-game text-[10px] font-extrabold text-emerald-300">0%</span>
+          </div>
         </div>
 
         <div id="hud-timer-box" class="hidden px-4 py-2 rounded-2xl bg-cyan-500/15 border border-cyan-400/45 text-center">
           <div id="hud-timer-label" class="text-[10px] font-extrabold uppercase text-cyan-300">Tempo</div>
-          <div id="hud-timer-display" class="font-mono-game text-lg font-extrabold text-white">00:00</div>
-        </div>
-      </div>
-
-      <!-- Barra de Progresso Visual -->
-      <div class="w-full sm:w-44 space-y-1">
-        <div class="flex justify-between text-[11px] font-bold text-slate-300">
-          <span>Progresso</span>
-          <span id="hud-percent-text" class="text-cyan-300">0%</span>
-        </div>
-        <div class="w-full h-3 rounded-full bg-slate-900 border border-slate-700 overflow-hidden">
-          <div
-            id="hud-progress-bar"
-            class="h-full w-0 rounded-full bg-gradient-to-r from-cyan-400 via-violet-500 to-emerald-400 transition-all duration-300"
-          ></div>
+          <div id="hud-timer-display" class="font-mono-game text-lg font-extrabold text-cyan-100">00:00</div>
         </div>
       </div>
     </section>
 
-    <!-- Corpo Principal: Tabuleiro + Pistas -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+    <!-- Corpo Principal: Pistas em Cima + Tabuleiro na Largura da Tela -->
+    <div class="flex flex-col gap-5">
 
-      <!-- Coluna Esquerda: Dica Ativa + Tabuleiro + Controles -->
-      <section class="lg:col-span-7 flex flex-col gap-4">
+      <!-- Pistas Horizontais e Verticais no Topo -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="arcade-panel rounded-3xl p-4 sm:p-5 space-y-2.5 border-cyan-400/30">
+          <h3 class="font-game text-base font-bold text-cyan-300 flex items-center gap-2">
+            <span>➡️</span>
+            <span>Horizontais</span>
+          </h3>
+          <div id="clues-across-list" class="space-y-2 max-h-[210px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="arcade-panel rounded-3xl p-4 sm:p-5 space-y-2.5 border-fuchsia-400/30">
+          <h3 class="font-game text-base font-bold text-fuchsia-300 flex items-center gap-2">
+            <span>⬇️</span>
+            <span>Verticais</span>
+          </h3>
+          <div id="clues-down-list" class="space-y-2 max-h-[210px] overflow-y-auto pr-1"></div>
+        </div>
+      </section>
+
+      <!-- Dica Ativa + Tabuleiro + Controles em Largura Total -->
+      <section class="w-full flex flex-col gap-4">
 
         <!-- Banner da Pergunta Selecionada -->
         <div class="arcade-panel rounded-3xl p-4 sm:p-5 border-violet-400/40 space-y-2">
@@ -958,8 +969,8 @@
         </div>
 
         <!-- Tabuleiro -->
-        <div class="arcade-panel rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center overflow-x-auto">
-          <div id="player-board-container" class="flex items-center justify-center py-2"></div>
+        <div class="arcade-panel w-full rounded-3xl p-3 sm:p-5 flex flex-col items-center justify-center overflow-hidden">
+          <div id="player-board-container" class="w-full flex items-center justify-center py-1"></div>
 
           <!-- Input oculto para abrir teclado nativo em celulares/tablets -->
           <input
@@ -1013,25 +1024,6 @@
               <span>Salvar PDF</span>
             </button>
           </div>
-        </div>
-      </section>
-
-      <!-- Coluna Direita: Lista de Pistas Horizontais e Verticais -->
-      <section class="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-5">
-        <div class="arcade-panel rounded-3xl p-4 sm:p-5 space-y-3 border-cyan-400/30">
-          <h3 class="font-game text-base font-bold text-cyan-300 flex items-center gap-2">
-            <span>➡️</span>
-            <span>Horizontais</span>
-          </h3>
-          <div id="clues-across-list" class="space-y-2 max-h-[260px] overflow-y-auto pr-1"></div>
-        </div>
-
-        <div class="arcade-panel rounded-3xl p-4 sm:p-5 space-y-3 border-fuchsia-400/30">
-          <h3 class="font-game text-base font-bold text-fuchsia-300 flex items-center gap-2">
-            <span>⬇️</span>
-            <span>Verticais</span>
-          </h3>
-          <div id="clues-down-list" class="space-y-2 max-h-[260px] overflow-y-auto pr-1"></div>
         </div>
       </section>
     </div>
@@ -2118,22 +2110,26 @@
 
     function computeResponsiveGridCssVars(rows, cols, containerEl) {
       const maxDim = Math.max(rows || 1, cols || 1);
-      const availWidth = containerEl && containerEl.clientWidth > 40
-        ? containerEl.clientWidth - 36
-        : Math.min(window.innerWidth - 64, 720);
+      const rectWidth = containerEl ? containerEl.getBoundingClientRect().width : 0;
+      const availWidth = rectWidth > 48
+        ? rectWidth - 16
+        : Math.max(240, window.innerWidth - 56);
 
-      // Ajusta o tamanho da célula conforme quantidade de colunas e largura disponível
-      const fitByWidth = Math.floor((availWidth - (cols + 1) * 4) / Math.max(1, cols));
-      let cellSize = Math.min(46, Math.max(22, fitByWidth));
+      const safeCols = Math.max(1, cols || 1);
+      const baseGap = safeCols >= 22 ? 2 : safeCols >= 14 ? 3 : 4;
+      const basePad = safeCols >= 18 ? 6 : 10;
 
-      if (maxDim >= 18) cellSize = Math.min(cellSize, 32);
-      if (maxDim >= 24) cellSize = Math.min(cellSize, 26);
+      // Calcula a largura máxima exata por coluna para nunca gerar rolagem horizontal
+      const fitByWidth = Math.floor((availWidth - basePad * 2 - (safeCols - 1) * baseGap) / safeCols);
+      let cellSize = Math.min(54, Math.max(14, fitByWidth));
 
-      const gap = cellSize <= 26 ? 2 : cellSize <= 34 ? 3 : 4;
-      const pad = cellSize <= 26 ? 6 : 10;
-      const radius = cellSize <= 26 ? 6 : 9;
-      const fontSizeRem = Math.max(0.72, Math.min(1.2, (cellSize * 0.46) / 16));
-      const numSizeRem = Math.max(0.52, Math.min(0.68, (cellSize * 0.26) / 16));
+      if (maxDim >= 24 && fitByWidth >= 18) cellSize = Math.min(cellSize, 34);
+
+      const gap = cellSize < 22 ? 1.5 : baseGap;
+      const pad = cellSize < 22 ? 5 : basePad;
+      const radius = cellSize < 20 ? 4 : cellSize < 28 ? 6 : 9;
+      const fontSizeRem = Math.max(0.58, Math.min(1.25, (cellSize * 0.46) / 16));
+      const numSizeRem = Math.max(0.45, Math.min(0.68, (cellSize * 0.27) / 16));
 
       return [
         `--cw-cell-size:${cellSize}px`,
