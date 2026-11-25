@@ -804,6 +804,68 @@
           </div>
           <div id="pairs-list" class="space-y-2 max-h-[430px] overflow-y-auto pr-1"></div>
         </div>
+
+        <!-- Cadastro e Subida em Lote -->
+        <div class="p-4 rounded-2xl bg-slate-950/80 border border-violet-400/35 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="font-game text-base font-bold text-white flex items-center gap-1.5">
+                <span>📦</span>
+                <span>Subir Perguntas e Respostas em Lote</span>
+              </h3>
+              <p class="text-xs text-slate-400">
+                Uma linha por item separando pergunta e resposta por <code class="text-cyan-300">|</code>, <code class="text-cyan-300">;</code> ou <code class="text-cyan-300"> - </code> (ou envie um <code class="text-cyan-300">.txt</code> / <code class="text-cyan-300">.csv</code>).
+              </p>
+            </div>
+            <label class="btn-3d btn-3d-slate px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0">
+              <span>📄</span>
+              <span>Subir .TXT / .CSV</span>
+              <input type="file" accept=".txt,.csv,text/plain,text/csv" onchange="handleBatchFileUpload(event)" class="hidden" />
+            </label>
+          </div>
+
+          <textarea
+            id="batch-pairs-textarea"
+            rows="5"
+            oninput="updateBatchPreview()"
+            placeholder="Exemplo:&#10;Maior planeta do Sistema Solar | JUPITER&#10;Capital do Brasil | BRASILIA&#10;Linguagem da web ; JAVASCRIPT"
+            class="w-full px-3.5 py-2.5 text-xs sm:text-sm font-mono-game rounded-xl border border-slate-700 bg-slate-900 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+          ></textarea>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span id="batch-preview-summary" class="font-bold text-cyan-300">
+              0 itens prontos no lote
+            </span>
+            <label class="flex items-center gap-2 text-slate-300 font-semibold cursor-pointer">
+              <input
+                id="batch-replace-existing"
+                type="checkbox"
+                class="w-4 h-4 accent-fuchsia-400 rounded cursor-pointer"
+              />
+              <span>Substituir lista atual</span>
+            </label>
+          </div>
+
+          <div id="batch-preview-list" class="hidden max-h-40 overflow-y-auto space-y-1.5 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs"></div>
+
+          <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onclick="clearBatchDraft()"
+              class="btn-3d btn-3d-slate px-3 py-2 rounded-xl text-xs font-bold"
+            >
+              Limpar Lote
+            </button>
+            <button
+              type="button"
+              onclick="applyBatchPairs()"
+              class="btn-3d btn-3d-violet px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-1.5"
+            >
+              <span>📥</span>
+              <span>Importar Lote na Grade</span>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -1888,71 +1950,146 @@
       showToast('Lista de palavras limpa.', 'info');
     }
 
-    function loadPresetSet(key) {
-      if (!PRESET_SETS[key]) return;
-      wordPairs = PRESET_SETS[key].map((item, i) => ({ ...item, id: `${key}_${Date.now()}_${i}` }));
+    /**
+     * Interpreta linhas de texto no formato "Pergunta | Resposta", "Pergunta; Resposta"
+     * ou "Pergunta - Resposta" para cadastro/importação em lote.
+     */
+    function parseBatchLines(rawText) {
+      const lines = String(rawText || '').split(/\r?\n/);
+      const valid = [];
+      const invalid = [];
+
+      lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let clue = '';
+        let rawAnswer = '';
+
+        const pipeMatch = trimmed.match(/^(.+?)\s*\|\s*(.+)$/);
+        const semiMatch = trimmed.match(/^(.+?)\s*;\s*(.+)$/);
+        const dashMatch = trimmed.match(/^(.+?)\s+[-–—]+\s+([A-Za-zÀ-ÿ\s]+)$/);
+
+        if (pipeMatch) {
+          clue = pipeMatch[1].trim();
+          rawAnswer = pipeMatch[2].trim();
+        } else if (semiMatch) {
+          clue = semiMatch[1].trim();
+          rawAnswer = semiMatch[2].trim();
+        } else if (dashMatch) {
+          clue = dashMatch[1].trim();
+          rawAnswer = dashMatch[2].trim();
+        } else {
+          invalid.push({ lineNum: index + 1, raw: trimmed, reason: 'Use separador |, ; ou -' });
+          return;
+        }
+
+        const answer = formatAnswerDisplay(rawAnswer);
+        if (!clue || answer.length < 2 || answer.length > 20) {
+          invalid.push({
+            lineNum: index + 1,
+            raw: trimmed,
+            reason: !clue ? 'Pergunta vazia' : 'Resposta precisa ter de 2 a 20 letras'
+          });
+          return;
+        }
+
+        valid.push({ clue, answer });
+      });
+
+      return { valid, invalid };
+    }
+
+    function updateBatchPreview() {
+      const textarea = document.getElementById('batch-pairs-textarea');
+      const summaryEl = document.getElementById('batch-preview-summary');
+      const listEl = document.getElementById('batch-preview-list');
+      if (!textarea || !summaryEl || !listEl) return;
+
+      const { valid, invalid } = parseBatchLines(textarea.value);
+      if (valid.length === 0 && invalid.length === 0) {
+        summaryEl.textContent = '0 itens prontos no lote';
+        summaryEl.className = 'font-bold text-cyan-300';
+        listEl.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+      }
+
+      summaryEl.textContent = invalid.length > 0
+        ? `${valid.length} válidos • ${invalid.length} com problema`
+        : `${valid.length} ${valid.length === 1 ? 'item pronto' : 'itens prontos'} no lote`;
+      summaryEl.className = invalid.length > 0 ? 'font-bold text-amber-300' : 'font-bold text-emerald-300';
+
+      const validHtml = valid.slice(0, 12).map(item => `
+        <div class="flex items-center justify-between gap-2 text-emerald-200">
+          <span class="truncate">✅ ${escapeHtml(item.clue)}</span>
+          <span class="font-mono-game font-bold text-cyan-300 shrink-0">${escapeHtml(item.answer)}</span>
+        </div>
+      `).join('');
+
+      const invalidHtml = invalid.slice(0, 8).map(err => `
+        <div class="text-rose-300 truncate">
+          ⚠️ Linha ${err.lineNum}: ${escapeHtml(err.reason)} (${escapeHtml(err.raw)})
+        </div>
+      `).join('');
+
+      listEl.innerHTML = validHtml + invalidHtml;
+      listEl.classList.remove('hidden');
+    }
+
+    function clearBatchDraft() {
+      const textarea = document.getElementById('batch-pairs-textarea');
+      if (textarea) textarea.value = '';
+      updateBatchPreview();
+    }
+
+    function applyBatchPairs() {
+      const textarea = document.getElementById('batch-pairs-textarea');
+      const replaceExisting = document.getElementById('batch-replace-existing')?.checked;
+      const { valid, invalid } = parseBatchLines(textarea ? textarea.value : '');
+
+      if (valid.length === 0) {
+        playSound('wrong');
+        showToast('Nenhuma linha válida encontrada no lote (use Pergunta | Resposta).', 'warning');
+        return;
+      }
+
+      const newItems = valid.map((item, idx) => ({
+        id: `batch_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+        clue: item.clue,
+        answer: item.answer
+      }));
+
+      wordPairs = replaceExisting ? newItems : [...wordPairs, ...newItems];
       cancelPairEdit();
       saveLocalState();
       renderPairsEditorList();
       generateCrosswordLayout();
       renderAdminGridPreview();
-      playSound('type');
-      showToast(`Conjunto "${key.toUpperCase()}" carregado!`, 'success');
+      playSound('correct');
+
+      if (invalid.length > 0) {
+        showToast(`${newItems.length} adicionadas; ${invalid.length} linha(s) ignorada(s).`, 'warning');
+      } else {
+        textarea.value = '';
+        updateBatchPreview();
+        showToast(`${newItems.length} palavras importadas para a grade!`, 'success');
+      }
     }
 
-    function regenerateGridWithFeedback() {
-      generateCrosswordLayout();
-      renderAdminGridPreview();
-      playSound('type');
-      showToast('Grade reorganizada!', 'info');
-    }
-
-    function exportPuzzleJson() {
-      syncConfigFromInputs();
-      const payload = {
-        gameConfig: { ...gameConfig, adminPin: '' },
-        wordPairs
-      };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'palavras-cruzadas.json';
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast('Arquivo JSON exportado!', 'success');
-    }
-
-    function importPuzzleJson(event) {
+    function handleBatchFileUpload(event) {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = () => {
-        try {
-          const parsed = JSON.parse(String(reader.result || ''));
-          if (Array.isArray(parsed.wordPairs)) {
-            wordPairs = parsed.wordPairs
-              .map((item, idx) => ({
-                id: item.id || `imp_${idx}_${Date.now()}`,
-                clue: String(item.clue || '').trim(),
-                answer: formatAnswerDisplay(item.answer || '')
-              }))
-              .filter(item => item.clue && item.answer.length >= 2);
-          }
-          if (parsed.gameConfig && typeof parsed.gameConfig === 'object') {
-            const keepPin = gameConfig.adminPin;
-            gameConfig = { ...gameConfig, ...parsed.gameConfig, adminPin: parsed.gameConfig.adminPin || keepPin };
-          }
-          saveLocalState();
-          populateAdminInputs();
-          renderPairsEditorList();
-          generateCrosswordLayout();
-          renderAdminGridPreview();
-          playSound('correct');
-          showToast('JSON importado com sucesso!', 'success');
-        } catch (err) {
-          playSound('wrong');
-          showToast('Arquivo JSON inválido.', 'error');
+        const textarea = document.getElementById('batch-pairs-textarea');
+        if (textarea) {
+          const current = textarea.value.trim();
+          const incoming = String(reader.result || '').trim();
+          textarea.value = current ? `${current}\n${incoming}` : incoming;
+          updateBatchPreview();
+          playSound('type');
+          showToast(`Arquivo "${file.name}" carregado na prévia do lote!`, 'info');
         }
       };
       reader.readAsText(file);
